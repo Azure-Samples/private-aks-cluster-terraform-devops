@@ -223,13 +223,85 @@ Likewise, the [destroy-redmine-via-helm](./pipelines/destroy-redmine-via-helm.ym
 > **NOTE**  
 > At the moment the [az network firewall policy rule-collection-group collection rule add](https://docs.microsoft.com/en-us/cli/azure/network/firewall/policy/rule-collection-group/collection/rule?view=azure-cli-latest#az_network_firewall_policy_rule_collection_group_collection_rule_add) is affected by an issue that may prevent the DNAT rule to work as expected. In this case, delete and re-create the rule manually in the rule collection panel of the Azure Firewall Policy using the Azure Portal.
 
+## Considerations ##
+In a production environment, the endpoints publicly exposed by Kubernetes services running in a private AKS cluster should be exposed using an ingress controller such as [NGINX Ingress Controller]() or [Application Gateway Ingress Controller]() that provides advanced functionalities such as path based routing, load balancing, SSL termination, and web access firewall. For more information, see the following articles:
+
+### Azure Kubernetes Service
+
+- [Create a private Azure Kubernetes Service cluster](https://github.com/paolosalvatori/private-aks-cluster)
+- [Best practices for multitenancy and cluster isolation](/azure/aks/operator-best-practices-cluster-isolation)
+- [Best practices for basic scheduler features in Azure Kubernetes Service (AKS)](/azure/aks/operator-best-practices-scheduler)
+- [Best practices for advanced scheduler features](/azure/aks/operator-best-practices-advanced-scheduler)
+- [Best practices for authentication and authorization](/azure/aks/operator-best-practices-advanced-scheduler)
+- [Best practices for cluster security and upgrades in Azure Kubernetes Service (AKS)](/azure/aks/operator-best-practices-cluster-security)
+- [Best practices for container image management and security in Azure Kubernetes Service (AKS)](/azure/aks/operator-best-practices-container-image-management)
+- [Best practices for network connectivity and security in Azure Kubernetes Service (AKS)](/azure/aks/operator-best-practices-network)
+- [Best practices for storage and backups in Azure Kubernetes Service (AKS)](/azure/aks/operator-best-practices-storage)
+- [Best practices for business continuity and disaster recovery in Azure Kubernetes Service (AKS)](/azure/aks/operator-best-practices-multi-region)
+- [Azure Kubernetes Services (AKS) day-2 operations guide](/azure/architecture/operator-guides/aks/day-2-operations-guide)
+
+### Azure Application Gateway
+
+- [Overview of WebSocket support in Application Gateway](/azure/application-gateway/application-gateway-websocket#websocket-enabled-backend)
+- [Configure end to end TLS by using Application Gateway with PowerShell](/azure/application-gateway/application-gateway-end-to-end-ssl-powershell)
+- [How an Application Gateway works](/azure/application-gateway/how-application-gateway-works)
+
+### Azure Application Gateway Ingress Controller
+
+- [Use Application Gateway Ingress Controller (AGIC) with a multi-tenant Azure Kubernetes Service (AKS)](https://docs.microsoft.com/en-us/azure/architecture/example-scenario/aks-agic/aks-agic)
+- [What is Application Gateway Ingress Controller?](/azure/application-gateway/ingress-controller-overview)
+- [Documentation for Application Gateway Ingress Controller](https://azure.github.io/application-gateway-kubernetes-ingress/)
+- [Annotations for Application Gateway Ingress Controller](/azure/application-gateway/ingress-controller-annotations)
+- [Certificate issuance with LetsEncrypt.org](https://azure.github.io/application-gateway-kubernetes-ingress/how-tos/lets-encrypt/)
+- [Tutorial: Enable the Ingress Controller add-on (preview) for a new AKS cluster with a new Application Gateway instance](/azure/application-gateway/tutorial-ingress-controller-add-on-new)
+- [Tutorial: Enable Application Gateway Ingress Controller add-on for an existing AKS cluster with an existing Application Gateway through Azure CLI (Preview)](/azure/application-gateway/tutorial-ingress-controller-add-on-existing)
+- [Difference between Helm deployment and AKS Add-On](/azure/application-gateway/ingress-controller-overview#difference-between-helm-deployment-and-aks-add-on)
+
+### NGINX Ingress Controller
+- [NGINX Ingress Controller documentation](https://docs.nginx.com/nginx-ingress-controller/)
+- [Enabling ModSecurity in the Kubernetes NGINX Ingress Controller](https://awkwardferny.medium.com/enabling-modsecurity-in-the-kubernetes-ingress-nginx-controller-111f9c877998)
+- [Create an HTTPS ingress controller on Azure Kubernetes Service (AKS)](https://docs.microsoft.com/en-us/azure/aks/ingress-tls)
+- [Create an NGINX ingress controller that uses an internal, private network and IP address](https://docs.microsoft.com/en-us/azure/aks/ingress-internal-ip)
+- [Create an NGINX ingress controller that uses your own TLS certificates](https://docs.microsoft.com/en-us/azure/aks/ingress-own-tls)
+- [Create an ingress controller that uses Let's Encrypt to automatically generate TLS certificates with a static public IP address](https://docs.microsoft.com/en-us/azure/aks/ingress-static-ip)
+
+### Azure Application Gateway WAF
+
+- [What is Azure Web Application Firewall on Azure Application Gateway?](/azure/web-application-firewall/ag/ag-overview)
+- [Web Application Firewall CRS rule groups and rules](/azure/web-application-firewall/ag/application-gateway-crs-rulegroups-rules?tabs=owasp31)
+- [Custom rules for Web Application Firewall v2 on Azure Application Gateway](/azure/web-application-firewall/ag/custom-waf-rules-overview)
+- [Quickstart: Create an Azure WAF v2 on Application Gateway using an ARM template](/azure/web-application-firewall/ag/quick-create-template)
+- [Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies Resource Type](/azure/templates/microsoft.network/applicationgatewaywebapplicationfirewallpolicies)
+- [Create and use Web Application Firewall v2 custom rules on Application Gateway](/azure/web-application-firewall/ag/create-custom-waf-rules)
+- [az network application-gateway waf-policy Azure CLI commands](/cli/azure/network/application-gateway/waf-policy?view=azure-cli-latest)
+- [Enable Web Application Firewall using the Azure CLI](/azure/web-application-firewall/ag/tutorial-restrict-web-traffic-cli)
+- [Configure per-site WAF policies using Azure PowerShell](/azure/web-application-firewall/ag/per-site-policies)
+- [Create Web Application Firewall policies for Application Gateway](/azure/web-application-firewall/ag/create-waf-policy-ag#migrate-to-waf-policy)
+
+## Related resources
+
+### Architectural guidance
+
+- [Azure Kubernetes Service (AKS) solution journey](/azure/architecture/reference-architectures/containers/aks-start-here)
+- [AKS cluster best practices](/Azure/aks/best-practices?toc=https%3A%2F%2Fdocs.microsoft.com%2Fen-us%2Fazure%2Farchitecture%2Ftoc.json&bc=https%3A%2F%2Fdocs.microsoft.com%2Fen-us%2Fazure%2Farchitecture%2Fbread%2Ftoc.json)
+- [Azure Kubernetes Services (AKS) day-2 operations guide](/azure/architecture/operator-guides/aks/day-2-operations-guide)
+- [Choosing a Kubernetes at the edge compute option](/azure/architecture/operator-guides/aks/choose-kubernetes-edge-compute-option)
+
+### Reference architectures
+
+- [Baseline architecture for an Azure Kubernetes Service (AKS) cluster](/azure/architecture/reference-architectures/containers/aks/secure-baseline-aks)
+- [Microservices architecture on Azure Kubernetes Service (AKS)](/azure/architecture/reference-architectures/containers/aks-microservices/aks-microservices)
+- [Advanced Azure Kubernetes Service (AKS) microservices architecture](/azure/architecture/reference-architectures/containers/aks-microservices/aks-microservices-advanced)
+- [CI/CD pipeline for container-based workloads](/azure/architecture/example-scenario/apps/devops-with-aks)
+- [Building a telehealth system on Azure](/azure/architecture/example-scenario/apps/telehealth-system)
+
 ## Visio ##
 
 In the [visio](./visio) folder you can find the Visio document which contains the above diagrams.
 
 ## Test access to your private AKS cluster ##
 
-If you open an ssh session to the Linux virtual machine via Azure Bastion and manually run the [nslookup](http://manpages.ubuntu.com/manpages/bionic/man1/nslookup.1.html) command using the FQND of the API server as a parameter, you should see an output like the the following:
+If you open an ssh session to the Linux virtual machine via Azure Bastion and manually run the [nslookup](http://manpages.ubuntu.com/manpages/bionic/man1/nslookup.1.html) command using the fully-qualified name (FQDN) of the API server as a parameter, you should see an output like the the following:
 
 ![Architecture](images/nslookup.png)
 
