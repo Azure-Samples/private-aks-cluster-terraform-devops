@@ -1,0 +1,6 @@
+vm_name="BabosbirdAdoAgentVm"
+log_analytics_workspace_name="BabosbirdAksWorkspace"
+log_analytics_resource_group_name="BabosbirdRG"
+virtual_network_resource_group_name="BabosbirdRG"
+virtual_network_name="BabosbirdAksVNet"
+subnet_name="VmSubnet"
