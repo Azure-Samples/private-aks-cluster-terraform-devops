@@ -184,7 +184,7 @@ The following picture shows the resources deployed by the ARM template in the MC
 
 ![MC Resource Group](images/mc_resourcegroup.png)
 
-## Deploy a workload ##
+## Install or uninstall a workload with Helm ##
 The resource definiton in the Terraform modules make use of the [lifecycle](https://www.terraform.io/docs/language/meta-arguments/lifecycle.html) meta-argument to customize the actions when Azure resources get changed changes outside of Terraform control. The [ignore_changes](https://www.terraform.io/docs/language/meta-arguments/lifecycle.html#ignore_changes) argument is used to instruct Terraform to ignore updates to given resource properties such as tags. The Azure Firewall Policy resource definition contains a lifecycle block to prevent Terraform to fix the resource when a rule collection or a single rule gets created, updated, or deleted. Likewise, the Azure Route Table contains a a lifecycle block to prevent Terraform to fix the resource when a user-defined route gets created, deleted, or updated. This allows to manage the NAT, Applicaion, and Network rules of an Azure Firewall Policy and the user-defined routes of an Azure Route Table outside of Terraform control.
 
 The [cd-redmine-via-helm](./pipelines/cd-redmine-via-helm.yml) pipeline shows how you can deploy a workload to a private AKS cluster using an [Azure DevOps Pipelines](https://docs.microsoft.com/en-us/azure/devops/pipelines/get-started/what-is-azure-pipelines?view=azure-devops) that runs on a [Self-hosted Agent](https://docs.microsoft.com/en-us/azure/devops/pipelines/agents/agents?tabs=browser). The pipeline performs the following steps:
