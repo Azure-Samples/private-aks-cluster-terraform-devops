@@ -23,7 +23,7 @@ products:
 - azure-devops
 - vs-code
 name: "Create a private Azure Kubernetes Service cluster using Terraform and Azure DevOps"
-description: "This sample shows how to create a private AKS cluster using Terraform and Azure DevOps in a hub and spoke network topology with Azure Firewall protecting egress traffic."
+description: "This sample shows how to create a private AKS cluster using Terraform and Azure DevOps in a hub and spoke network topology with Azure Firewall."
 urlFragment: "private-aks-cluster-terraform-devops"
 ---
 
