@@ -4,6 +4,7 @@ languages:
 - azurecli
 - bash
 - javascript
+- terraform
 products:
 - azure
 - azure-firewall
@@ -13,18 +14,15 @@ products:
 - azure-blob-storage
 - azure-storage-accounts
 - azure-bastion
-- azure-dns
 - azure-private-link
 - azure-virtual-network
-- azure-resource-manager
 - azure-key-vault
 - azure-log-analytics
 - azure-virtual-machines
 - azure-devops
-- vs-code
-name: "Create a private Azure Kubernetes Service cluster using Terraform and Azure DevOps"
-description: "This sample shows how to create a private AKS cluster using Terraform and Azure DevOps in a hub and spoke network topology with Azure Firewall."
-urlFragment: "private-aks-cluster-terraform-devops"
+name: Create a private Azure Kubernetes Service cluster using Terraform and Azure DevOps
+description: This sample shows how to create a private AKS cluster using Terraform and Azure DevOps in a hub and spoke network topology with Azure Firewall.
+urlFragment: private-aks-cluster-terraform-devops
 ---
 
 # Create a private Azure Kubernetes Service cluster using Terraform and Azure DevOps #
