@@ -1,0 +1,50 @@
+name: $(BuildDefinitionName)_$(date:yyyyMMdd)$(rev:.r)
+
+trigger: none
+pr: none
+
+variables:
+- group: global-variables
+- name: azureSubscription
+  value: AzureSubscription
+- name: terraformVersion
+  value: 1.0.7
+- name: terraformPath
+  value: terraform
+- name: tfstatePath
+  value: terraform.tfstate
+  
+pool:
+    vmImage: ubuntu-latest
+
+stages :
+- stage: destroy
+  displayName: 'Terraform Destroy'
+  jobs:
+  - job: destroy
+    displayName: 'Terraform Destroy'
+    continueOnError: false
+    steps:
+    - task: TerraformInstaller@0
+      displayName: 'Terraform Install'
+      inputs:
+        terraformVersion: $(terraformVersion)
+    - task: TerraformTaskV2@2
+      displayName: 'Terraform Init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        backendServiceArm: $(azureSubscription)
+        backendAzureRmResourceGroupName: $(terraformBackendResourceGroupName)
+        backendAzureRmStorageAccountName: $(terraformBackendStorageAccountName)
+        backendAzureRmContainerName: '$(terraformBackendContainerName)'
+        backendAzureRmKey: $(tfstatePath)
+        workingDirectory: '$(System.DefaultWorkingDirectory)/$(terraformPath)/'
+    - task: TerraformTaskV1@0
+      displayName: 'Terraform Destroy'
+      inputs:
+        provider: 'azurerm'
+        command: 'destroy'
+        commandOptions: '-input=false -auto-approve -var ssh_public_key="$(sshPublicKey)'
+        environmentServiceNameAzureRM: $(azureSubscription)
+        workingDirectory: '$(System.DefaultWorkingDirectory)/$(terraformPath)/'

@@ -1,0 +1,219 @@
+name: $(BuildDefinitionName)_$(date:yyyyMMdd)$(rev:.r)
+
+trigger: none
+pr: none
+
+variables:
+- group: global-variables
+- name: azureSubscription
+  value: AzureSubscription
+- name: environment
+  value: production
+- name: helmVersion
+  value: latest
+- name: kubectlVersion
+  value: latest
+- name: aksName
+  value: BabosbirdAks
+- name: resourceGroupName
+  value: BabosbirdRG
+- name: firewallName
+  value: BabosbirdFirewall
+- name: firewallPolicyName
+  value: BabosbirdFirewallPolicy 
+- name: routeTableName
+  value: DefaultRouteTable
+- name: releaseName
+  value: redmine
+- name: namespace
+  value: sample
+- name: serviceName
+  value: redmine
+- name: ruleCollectionGroupName
+  value: DefaultDnatRuleCollectionGroup
+- name: dnatRuleCollectionName
+  value: DnatRules
+- name: publicIpAddressResourceGroupName
+  value: PublicIpsRG
+  
+pool: Terraform
+
+stages :
+- stage: helm_deployment
+  displayName: Delete Worload
+  jobs: 
+  - deployment: production
+    displayName: Destroy Helm Release
+    environment: $(environment)
+    continueOnError: false
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: none
+          - task: HelmInstaller@1
+            displayName: 'Install Helm'
+            enabled: false
+            inputs:
+              helmVersionToInstall: $(helmVersion)
+          - task: KubectlInstaller@0
+            displayName: 'Install Kubectl'
+            enabled: false
+            inputs:
+              kubectlVersion: $(kubectlVersion)
+          - task: AzureCLI@2
+            displayName: 'Deploy Helm Chart'
+            inputs:
+              scriptType: bash
+              scriptLocation: inlineScript
+              azureSubscription: $(azureSubscription)
+              addSpnToEnvironment: true
+              inlineScript: |
+                # variables
+                subscriptionName=$(az account show --query name --output tsv)
+
+                # Allow installing Azure CLI extensions without prompt
+                az config set extension.use_dynamic_install=yes_without_prompt
+
+                # Get AKS credentials
+                echo "Retrieving credentials for [$(aksName)] AKS cluster..."
+                az aks get-credentials \
+                  --name $(aksName) \
+                  --resource-group $(resourceGroupName) \
+                  --overwrite-existing \
+                  --admin
+                  
+                if  [[ $? == 0 ]]; then
+                  echo "Successfully retrieved credentials for [$(aksName)] AKS cluster"
+                else
+                  echo "Failed to retrieve credentials for [$(aksName)] AKS cluster"
+                  exit -1
+                fi
+
+                # Check if a Helm release exists using the namespace
+                ns=$(namespace)
+                exists=$(sudo helm list -A --output json | jq -r '.[].namespace | select(. == "'$ns'")')
+
+                if [[ -n $exists ]]; then
+                  echo "A [$(releaseName)] Helm release exists in the [$(namespace)] namespace"
+                  echo "Uninstalling [$(helmChartName)] Helm chart to [$(releaseName)] Helm release..."
+                  
+                  # Uninstall Helm chart
+                  sudo helm uninstall $(releaseName) --namespace $(namespace)
+                  
+                  if  [[ $? == 0 ]]; then
+                    echo "Successfully uninstalled the [$(releaseName)] Helm release in the [$(namespace)] namespace"
+                  else
+                    echo "Failed to uninstall the [$(releaseName)] Helm release in the [$(namespace)] namespace"
+                    exit -1
+                  fi
+                else
+                  echo "No [$(releaseName)] Helm release exists in the [$(namespace)] namespace"
+                fi
+
+                # Delete namespace
+                ns=$(namespace)
+                result=$(sudo kubectl get namespace -o 'jsonpath={.items[?(@.metadata.name=="'$ns'")].metadata.name'})
+
+                if [[ -n $result ]]; then
+                    # Delete the namespace for your ingress resources
+                    echo "Deleting [$(namespace)] namespace in the [$(aksName)] cluster..."
+                    sudo kubectl delete namespace $(namespace)
+                fi
+
+                # Delete prefix
+                s1=$(aksName)
+                s2=$(namespace)
+                s3=$(serviceName)
+                prefix="${s1^}_${s2^}_${s3^}"
+
+                # Delete DNAT rule
+                dnatRuleName="${prefix}_Rule"
+                echo "Deleting [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy..."
+
+                az network firewall policy rule-collection-group collection rule remove \
+                  --policy-name $(firewallPolicyName) \
+                  --resource-group $(resourceGroupName) \
+                  --rule-collection-group-name $(ruleCollectionGroupName) \
+                  --collection-name $(dnatRuleCollectionName) \
+                  --name $dnatRuleName &>/dev/null
+              
+                if [[ $? == 0 ]]; then
+                  echo "[$dnatRuleName] DNAT rule successfully deleted in the [$(firewallPolicyName)] firewall policy"
+                fi
+
+                # Delete user-defined route in the route table
+                udrName="${prefix}_Udr"
+                echo "Checking if [$udrName] user-defined route exists in the [$(routeTableName)] route table..."
+
+                az network route-table route show \
+                  --name $udrName \
+                  --route-table-name $(routeTableName) \
+                  --resource-group $(resourceGroupName) &>/dev/null
+                
+                if [[ $? == 0 ]]; then
+                  echo "[$udrName] user-defined route exists in the [$(routeTableName)] route table"
+                  echo "Deleting [$udrName] user-defined route in the [$(routeTableName)] route table..."
+
+                  az network route-table route delete \
+                    --name $udrName \
+                    --route-table-name $(routeTableName) \
+                    --resource-group $(resourceGroupName) &>/dev/null
+
+                  if [[ $? == 0 ]]; then
+                    echo "[$udrName] user-defined route successfully deleted in the [$(routeTableName)] route table"
+                  else
+                    echo "Failed to delete [$udrName] user-defined route in the [$(routeTableName)] route table"
+                    exit -1
+                  fi
+                fi
+
+                # Delete firewall Ip configuration with the new public Ip address
+                firewallIpConfig="${prefix}_Config"
+                echo "Checking if [$firewallIpConfig] firewall IP configuration exists in the [$(firewallName)] firewall..."
+                
+                az network firewall ip-config show \
+                  --name $firewallIpConfig \
+                  --firewall-name $(firewallName) \
+                  --resource-group $(resourceGroupName) &>/dev/null
+                
+                if [[ $? == 0 ]]; then
+                  echo "[$firewallIpConfig] firewall IP configuration exists in the [$(firewallName)] firewall"
+                  echo "Deleting [$firewallIpConfig] firewall IP configuration in the [$(firewallName)] firewall..."
+
+                  az network firewall ip-config delete \
+                    --name $firewallIpConfig \
+                    --firewall-name $(firewallName) \
+                    --resource-group $(resourceGroupName) &>/dev/null
+
+                  if [[ $? == 0 ]]; then
+                    echo "[$firewallIpConfig] firewall IP configuration successfully deleted in the [$(firewallName)] firewall"
+                  else
+                    echo "Failed to delete [$firewallIpConfig] firewall IP configuration in the [$(firewallName)] firewall"
+                    exit -1
+                  fi
+                fi
+
+                # Delete public IP address
+                firewallPublicIpName="${prefix}_PublicIp"
+                echo "Checking if [$firewallPublicIpName] public IP exists in the [$(publicIpAddressResourceGroupName)] resource group..."
+                
+                az network public-ip show \
+                  --name $firewallPublicIpName \
+                  --resource-group $(publicIpAddressResourceGroupName) &>/dev/null
+                
+                if [[ $? == 0 ]]; then
+                  echo "[$firewallPublicIpName] public IP exists [$(publicIpAddressResourceGroupName)] resource group"
+                  echo "Deleting [$firewallPublicIpName] public IP in the [$(publicIpAddressResourceGroupName)] resource group..."
+                  
+                  az network public-ip delete \
+                    --name $firewallPublicIpName \
+                    --resource-group $(publicIpAddressResourceGroupName) &>/dev/null
+                
+                  if [[ $? == 0 ]]; then
+                    echo "[$firewallPublicIpName] public IP successfully deleted in the [$(publicIpAddressResourceGroupName)] resource group"
+                  else
+                    echo "Failed to delete [$firewallPublicIpName] public IP in the [$(publicIpAddressResourceGroupName)] resource group"
+                    exit -1
+                  fi
+                fi
