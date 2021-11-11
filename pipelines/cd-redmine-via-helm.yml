@@ -47,6 +47,18 @@ variables:
   value: 80
 - name: translatedPort
   value: 80
+- name: kubefile
+  value: ./kubeconfig
+- name: KUBECONFIG
+  value: ./kubeconfig
+- name: HELM_EXPERIMENTAL_OCI
+  value: 1
+- name: domain
+  value: babosbird.com
+- name: subdomain
+  value: redmine
+- name: dnsZoneResourceGroupName
+  value: DnsResourceGroup
   
 pool: Terraform
 
@@ -89,11 +101,12 @@ stages :
 
                 # Get AKS credentials
                 echo "Retrieving credentials for [$(aksName)] AKS cluster..."
-                az aks get-credentials \
+                 az aks get-credentials \
                   --name $(aksName) \
                   --resource-group $(resourceGroupName) \
                   --overwrite-existing \
-                  --admin
+                  --file $(kubefile) \
+                  --admin \
                   
                 if  [[ $? == 0 ]]; then
                   echo "Successfully retrieved credentials for [$(aksName)] AKS cluster"
@@ -104,7 +117,7 @@ stages :
                 
                 # Add Helm repo
                 echo "Adding [$(helmRepoName)] Helm repo..."
-                sudo helm repo add $(helmRepoName) $(helmRepoUrl)
+                helm repo add $(helmRepoName) $(helmRepoUrl)
                 
                 if  [[ $? == 0 ]]; then
                   echo "Successfully added [$(helmRepoName) - $(helmRepoUrl)] Helm repo"
@@ -115,15 +128,15 @@ stages :
 
                 # Check if a Helm release already exists
                 ns=$(namespace)
-                exists=$(sudo helm list -A --output json | jq -r '.[].namespace | select(. == "'$ns'")')
+                exists=$(helm list -A --output json | jq -r '.[].namespace | select(. == "'$ns'")')
 
                 if [[ -n $exists ]]; then
                   echo "A [$(releaseName)] Helm release already exists in the [$(namespace)] namespace"
                   echo "Upgrading [$(helmChartName)] Helm chart in the [$(releaseName)] Helm release..."
-                  redminePassword=$(sudo kubectl get secret --namespace $(namespace) redmine -o jsonpath="{.data.redmine-password}" | base64 --decode)
+                  redminePassword=$(kubectl get secret --namespace $(namespace) redmine -o jsonpath="{.data.redmine-password}" | base64 --decode)
 
                   # Install Helm chart
-                  sudo helm upgrade \
+                  helm upgrade \
                     --namespace $(namespace) \
                     --create-namespace \
                     --install \
@@ -139,7 +152,7 @@ stages :
                   echo "Installing [$(helmChartName)] Helm chart to [$(releaseName)] Helm release..."
 
                   # Install Helm chart
-                  sudo helm install \
+                  helm install \
                     --namespace $(namespace) \
                     --create-namespace \
                     --wait \
@@ -161,12 +174,12 @@ stages :
                 serviceExternalIpAddress=""
                 while [ -z $serviceExternalIpAddress ]; do
                   echo "Waiting for end point..."
-                  serviceExternalIpAddress=$(sudo kubectl get service $(serviceName) -n $(namespace) --template="{{range .status.loadBalancer.ingress}}{{.ip}}{{end}}")
+                  serviceExternalIpAddress=$(kubectl get service $(serviceName) -n $(namespace) --template="{{range .status.loadBalancer.ingress}}{{.ip}}{{end}}")
                   [ -z "$serviceExternalIpAddress" ] && sleep 10
                 done
                 echo "[$(serviceName)] service endpoint ready: $serviceExternalIpAddress"
 
-                # Create resource group
+                # Create resource group for public IP addresses
                 echo "Checking if [$(publicIpAddressResourceGroupName)] resource group actually exists in the [$subscriptionName] subscription..."
                 az group show --name $(publicIpAddressResourceGroupName) &>/dev/null
 
@@ -253,6 +266,7 @@ stages :
 
                 if [[ -n $firewallPublicIpAddress ]]; then
                   echo "[$firewallPublicIpAddress] address of the [$firewallPublicIpName] public IP successfully retrieved"
+                  echo "##vso[task.setvariable variable=firewallPublicIpAddress;]$firewallPublicIpAddress"
                 else
                   echo "Failed to retrieve the address of the [$firewallPublicIpName]"
                   exit -1
@@ -352,7 +366,7 @@ stages :
                 az network route-table route show \
                   --name $udrName \
                   --route-table-name $(routeTableName) \
-                  --resource-group $(resourceGroupName) &>/dev/null
+                  --resource-group $(resourceGroupName) 1>/dev/null
                 
                 if [[ $? != 0 ]]; then
                   echo "No [$udrName] user-defined route exists in the [$(routeTableName)] route table"
@@ -373,4 +387,77 @@ stages :
                   fi
                 else
                   echo "[$udrName] user-defined route already exists in the [$(routeTableName)] route table"
+                fi
+          - task: AzureCLI@2
+            displayName: 'Configure DNS'
+            inputs:
+              scriptType: bash
+              scriptLocation: inlineScript
+              azureSubscription: $(azureSubscription)
+              addSpnToEnvironment: true
+              inlineScript: |
+                # Check if an A record for the subdomain exists in the DNS Zone
+                echo "Retrieving the A record for the [$(subdomain)] subdomain from the [$(domain)] DNS zone..."
+                ipv4Address=$(az network dns record-set a list \
+                    --zone-name $(domain) \
+                    --resource-group $(dnsZoneResourceGroupName) \
+                    --query "[?name=='$(subdomain)'].arecords[].ipv4Address" \
+                    --output tsv)
+
+                if [[ -n $ipv4Address ]]; then
+                    echo "An A record already exists in [$(domain)] DNS zone for the [$(subdomain)] subdomain with [$ipv4Address] IP address"
+
+                    if [[ $ipv4Address == $(firewallPublicIpAddress) ]]; then
+                        echo "The [$ipv4Address] ip address of the existing A record is equal to the ip address of the [$ingressName] ingress"
+                        echo "No additional step is required"
+                        exit
+                    else
+                        echo "The [$ipv4Address] ip address of the existing A record is different than the ip address of the [$ingressName] ingress"
+                    fi
+
+                    # Retrieving name of the record set relative to the zone
+                    echo "Retrieving the name of the record set relative to the [$(domain)] zone..."
+
+                    recordSetName=$(az network dns record-set a list \
+                        --zone-name $(domain) \
+                        --resource-group $(dnsZoneResourceGroupName) \
+                        --query "[?name=='$(subdomain)'].name" \
+                        --output name 2>/dev/null)
+
+                    if [[ -n $recordSetName ]]; then
+                        "[$recordSetName] record set name successfully retrieved"
+                    else
+                        "Failed to retrieve the name of the record set relative to the [$(domain)] zone"
+                        exit
+                    fi
+
+                    # Remove the a record
+                    echo "Removing the A record from the record set relative to the [$(domain)] zone..."
+
+                    az network dns record-set a remove-record \
+                        --ipv4-address $ipv4Address \
+                        --record-set-name $recordSetName \
+                        --zone-name $(domain) \
+                        --resource-group $(dnsZoneResourceGroupName) \
+
+                    if [[ $? == 0 ]]; then 
+                        echo "[$ipv4Address] ip address successfully removed from the [$recordSetName] record set"
+                    else
+                        echo "Failed to remove the [$ipv4Address] ip address from the [$recordSetName] record set"
+                        exit
+                    fi
+                fi
+
+                # Create the a record    
+                echo "Creating an A record in [$(domain)] DNS zone for the [$(subdomain)] subdomain with [$(firewallPublicIpAddress)] IP address..."
+                az network dns record-set a add-record \
+                    --zone-name $(domain) \
+                    --resource-group $(dnsZoneResourceGroupName) \
+                    --record-set-name $(subdomain) \
+                    --ipv4-address $(firewallPublicIpAddress) 1>/dev/null
+
+                if [[ $? == 0 ]]; then
+                    echo "A record for the [$(subdomain)] subdomain with [$(firewallPublicIpAddress)] IP address successfully created in [$(domain)] DNS zone"
+                else
+                    echo "Failed to create an A record for the $(subdomain) subdomain with [$(firewallPublicIpAddress)] IP address in [$(domain)] DNS zone"
                 fi

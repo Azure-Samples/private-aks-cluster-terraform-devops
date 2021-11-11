@@ -1,0 +1,91 @@
+{{- $portName := include "syntheticapi.portName" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "syntheticapi.fullname" . }}
+  labels:
+    {{- include "syntheticapi.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "syntheticapi.selectorLabels" . | nindent 6 }}
+  strategy:
+    rollingUpdate:
+      maxSurge: {{ .Values.strategy.rollingUpdate.maxSurge | default 1 }}
+      maxUnavailable: {{ .Values.strategy.rollingUpdate.maxUnavailable | default 1 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "syntheticapi.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "syntheticapi.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: {{ $portName }}
+              containerPort: 80
+              protocol: TCP
+          {{- with .Values.livenessProbe}}
+          livenessProbe:
+            httpGet:
+              path: {{ .httpGet.path | default "/" | quote }}
+              port: {{ $portName }}
+            failureThreshold: {{ .failureThreshold | default 1 }}
+            initialDelaySeconds: {{ .initialDelaySeconds | default 10 }}
+            periodSeconds: {{ .periodSeconds | default 10 }}
+          {{- end }}
+          {{- with .Values.readinessProbe}}
+          readinessProbe:
+            httpGet:
+              path: {{ .httpGet.path | default "/" | quote }}
+              port: {{ $portName }}
+            failureThreshold: {{ .failureThreshold | default 1 }}
+            initialDelaySeconds: {{ .initialDelaySeconds | default 10 }}
+            periodSeconds: {{ .periodSeconds | default 10 }}
+          {{- end }}
+          {{- with .Values.startupProbe}}
+          startupProbe:
+            httpGet:
+              path: {{ .httpGet.path | default "/" | quote }}
+              port:  {{ $portName }}
+            failureThreshold: {{ .failureThreshold | default 1 }}
+            initialDelaySeconds: {{ .initialDelaySeconds | default 10 }}
+            periodSeconds: {{ .periodSeconds | default 10 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

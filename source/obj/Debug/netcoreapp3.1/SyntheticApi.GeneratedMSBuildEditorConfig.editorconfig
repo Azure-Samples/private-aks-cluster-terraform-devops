@@ -1,0 +1,3 @@
+is_global = true
+build_property.RootNamespace = SyntheticApi
+build_property.ProjectDir = c:\Projects\AzureProjects\Terraform\azure-devops-aks-azure-sample\source\

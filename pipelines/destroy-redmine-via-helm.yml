@@ -35,6 +35,12 @@ variables:
   value: DnatRules
 - name: publicIpAddressResourceGroupName
   value: PublicIpsRG
+- name: kubefile
+  value: ./kubeconfig
+- name: KUBECONFIG
+  value: ./kubeconfig
+- name: HELM_EXPERIMENTAL_OCI
+  value: 1
   
 pool: Terraform
 
@@ -81,7 +87,8 @@ stages :
                   --name $(aksName) \
                   --resource-group $(resourceGroupName) \
                   --overwrite-existing \
-                  --admin
+                  --file $(kubefile) \
+                  --admin \
                   
                 if  [[ $? == 0 ]]; then
                   echo "Successfully retrieved credentials for [$(aksName)] AKS cluster"
@@ -92,14 +99,14 @@ stages :
 
                 # Check if a Helm release exists using the namespace
                 ns=$(namespace)
-                exists=$(sudo helm list -A --output json | jq -r '.[].namespace | select(. == "'$ns'")')
+                exists=$(helm list -A --output json | jq -r '.[].namespace | select(. == "'$ns'")')
 
                 if [[ -n $exists ]]; then
                   echo "A [$(releaseName)] Helm release exists in the [$(namespace)] namespace"
                   echo "Uninstalling [$(helmChartName)] Helm chart to [$(releaseName)] Helm release..."
                   
                   # Uninstall Helm chart
-                  sudo helm uninstall $(releaseName) --namespace $(namespace)
+                  helm uninstall $(releaseName) --namespace $(namespace)
                   
                   if  [[ $? == 0 ]]; then
                     echo "Successfully uninstalled the [$(releaseName)] Helm release in the [$(namespace)] namespace"
@@ -113,12 +120,12 @@ stages :
 
                 # Delete namespace
                 ns=$(namespace)
-                result=$(sudo kubectl get namespace -o 'jsonpath={.items[?(@.metadata.name=="'$ns'")].metadata.name'})
+                result=$(kubectl get namespace -o 'jsonpath={.items[?(@.metadata.name=="'$ns'")].metadata.name'})
 
                 if [[ -n $result ]]; then
                     # Delete the namespace for your ingress resources
                     echo "Deleting [$(namespace)] namespace in the [$(aksName)] cluster..."
-                    sudo kubectl delete namespace $(namespace)
+                    kubectl delete namespace $(namespace)
                 fi
 
                 # Delete prefix
@@ -149,7 +156,7 @@ stages :
                 az network route-table route show \
                   --name $udrName \
                   --route-table-name $(routeTableName) \
-                  --resource-group $(resourceGroupName) &>/dev/null
+                  --resource-group $(resourceGroupName) 1>/dev/null
                 
                 if [[ $? == 0 ]]; then
                   echo "[$udrName] user-defined route exists in the [$(routeTableName)] route table"
@@ -158,7 +165,7 @@ stages :
                   az network route-table route delete \
                     --name $udrName \
                     --route-table-name $(routeTableName) \
-                    --resource-group $(resourceGroupName) &>/dev/null
+                    --resource-group $(resourceGroupName) 1>/dev/null
 
                   if [[ $? == 0 ]]; then
                     echo "[$udrName] user-defined route successfully deleted in the [$(routeTableName)] route table"
@@ -175,7 +182,7 @@ stages :
                 az network firewall ip-config show \
                   --name $firewallIpConfig \
                   --firewall-name $(firewallName) \
-                  --resource-group $(resourceGroupName) &>/dev/null
+                  --resource-group $(resourceGroupName) 1>/dev/null
                 
                 if [[ $? == 0 ]]; then
                   echo "[$firewallIpConfig] firewall IP configuration exists in the [$(firewallName)] firewall"
@@ -184,7 +191,7 @@ stages :
                   az network firewall ip-config delete \
                     --name $firewallIpConfig \
                     --firewall-name $(firewallName) \
-                    --resource-group $(resourceGroupName) &>/dev/null
+                    --resource-group $(resourceGroupName) 1>/dev/null
 
                   if [[ $? == 0 ]]; then
                     echo "[$firewallIpConfig] firewall IP configuration successfully deleted in the [$(firewallName)] firewall"
@@ -208,7 +215,7 @@ stages :
                   
                   az network public-ip delete \
                     --name $firewallPublicIpName \
-                    --resource-group $(publicIpAddressResourceGroupName) &>/dev/null
+                    --resource-group $(publicIpAddressResourceGroupName) 1>/dev/null
                 
                   if [[ $? == 0 ]]; then
                     echo "[$firewallPublicIpName] public IP successfully deleted in the [$(publicIpAddressResourceGroupName)] resource group"

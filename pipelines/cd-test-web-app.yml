@@ -1,0 +1,694 @@
+name: $(BuildDefinitionName)_$(date:yyyyMMdd)$(rev:.r)
+
+trigger: none
+pr: none
+
+variables:
+- group: global-variables
+- name: azureSubscription
+  value: AzureSubscription
+- name: environment
+  value: production
+- name: helmVersion
+  value: latest
+- name: kubectlVersion
+  value: latest
+- name: nginxNamespace
+  value: nginx-ingress
+- name: nginxRepoName
+  value: ingress-nginx
+- name: nginxRepoUrl
+  value: https://kubernetes.github.io/ingress-nginx
+- name: nginxChartName
+  value: ingress-nginx
+- name: nginxReleaseName
+  value: nginx-ingress
+- name: nginxReplicaCount
+  value: 3
+- name: certificationManagerNamespace
+  value: cert-manager
+- name: certificationManagerRepoName
+  value: jetstack
+- name: certificationManagerRepoUrl
+  value: https://charts.jetstack.io
+- name: certificationManagerChartName
+  value: cert-manager
+- name: certificationManagerReleaseName
+  value: cert-manager
+- name: clusterIssuerEmail
+  value: paolos@microsoft.com
+- name: clusterIssuerNamespace
+  value: default
+- name: clusterIssuerName
+  value: letsencrypt-nginx
+- name: workloadChartName
+  value: syntheticapi
+- name: workloadChartVersion
+  version: 0.1.0
+- name: workloadReleaseName
+  value: testapi
+- name: workloadNamespace
+  value: testapi
+- name: aksName
+  value: BabosbirdAks
+- name: resourceGroupName
+  value: BabosbirdRG
+- name: firewallName
+  value: BabosbirdFirewall
+- name: firewallPolicyName
+  value: BabosbirdFirewallPolicy 
+- name: routeTableName
+  value: DefaultRouteTable
+- name: location
+  value: westeurope
+- name: ruleCollectionGroupName
+  value: DefaultDnatRuleCollectionGroup
+- name: dnatRuleCollectionName
+  value: DnatRules
+- name: publicIpAddressResourceGroupName
+  value: PublicIpsRG
+- name: maxRetries
+  value: 100
+- name: sleepInterval
+  value: 1
+- name: kubefile
+  value: ./kubeconfig
+- name: KUBECONFIG
+  value: ./kubeconfig
+- name: HELM_EXPERIMENTAL_OCI
+  value: 1
+- name: domain
+  value: babosbird.com
+- name: subdomain
+  value: king
+- name: dnsZoneResourceGroupName
+  value: DnsResourceGroup
+  
+pool: Terraform
+
+stages :
+- stage: helm_deployment
+  displayName: Install Workload
+  jobs: 
+  - deployment: production
+    displayName: Workload Deployment
+    environment: $(environment)
+    continueOnError: false
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: none
+          - bash: |
+              # Set ACR name lowercase
+              acrName=$(echo $(registryServerName) | awk '{print tolower($0)}')
+              echo "##vso[task.setvariable variable=acrName;]$acrName"
+            failOnStderr: true
+            displayName: 'ACR Name ToLower'
+          - task: HelmInstaller@1
+            displayName: 'Install Helm'
+            enabled: false
+            inputs:
+              helmVersionToInstall: $(helmVersion)
+          - task: KubectlInstaller@0
+            displayName: 'Install Kubectl'
+            enabled: false
+            inputs:
+              kubectlVersion: $(kubectlVersion)
+          - task: AzureCLI@2
+            displayName: 'Get AKS Credentials'
+            inputs:
+              scriptType: bash
+              scriptLocation: inlineScript
+              azureSubscription: $(azureSubscription)
+              addSpnToEnvironment: true
+              inlineScript: |
+                # Get AKS credentials
+                echo "Retrieving credentials for [$(aksName)] AKS cluster..."
+                az aks get-credentials \
+                  --name $(aksName) \
+                  --resource-group $(resourceGroupName) \
+                  --overwrite-existing \
+                  --file $(kubefile) \
+                  --admin \
+
+                if  [[ $? == 0 ]]; then
+                  echo "Successfully retrieved credentials for [$(aksName)] AKS cluster"
+                else
+                  echo "Failed to retrieve credentials for [$(aksName)] AKS cluster"
+                  exit -1
+                fi
+          - task: AzureCLI@2
+            displayName: 'Deploy Certificate Manager'
+            inputs:
+              scriptType: bash
+              scriptLocation: inlineScript
+              azureSubscription: $(azureSubscription)
+              addSpnToEnvironment: true
+              inlineScript: |
+                # variables
+                subscriptionName=$(az account show --query name --output tsv)
+
+                # Allow installing Azure CLI extensions without prompt
+                az config set extension.use_dynamic_install=yes_without_prompt
+
+                # Label the namespace to disable resource validation
+                kubectl label namespace $(certificationManagerNamespace) cert-manager.io/disable-validation=true
+
+                # Check if the repository is not already added
+                result=$(helm repo list | grep $(certificationManagerRepoName) | awk '{print $1}')
+
+                if [[ -n $result ]]; then
+                  echo "[$(certificationManagerRepoName)] Helm repo already exists"
+                else
+                  # Add the repository
+                  echo "Adding [$(certificationManagerRepoName)] Helm repo..."
+                  helm repo add $(certificationManagerRepoName) $(certificationManagerRepoUrl)
+                fi
+
+                # Update your local Helm chart repository cache
+                echo 'Updating Helm repos...'
+                helm repo update
+
+                # Install cert-manager Helm chart
+                result=$(helm list -n $(certificationManagerNamespace) | grep $(certificationManagerReleaseName) | awk '{print $1}')
+
+                if [[ -n $result ]]; then
+                  echo "[$(certificationManagerReleaseName)] release already exists in the [$(certificationManagerNamespace)] namespace"
+                else
+                  # Install the cert-manager Helm chart
+                  echo "[$(certificationManagerReleaseName)] release already exists in the [$(certificationManagerNamespace)] namespace"
+                  helm install $(certificationManagerReleaseName) $(certificationManagerRepoName)/$(certificationManagerChartName) \
+                    --namespace $(certificationManagerNamespace) \
+                    --create-namespace \
+                    --set installCRDs=true \
+                    --set nodeSelector."beta\.kubernetes\.io/os"=linux
+                fi
+          - task: AzureCLI@2
+            displayName: 'Create Cluster Issuer'
+            inputs:
+              scriptType: bash
+              scriptLocation: inlineScript
+              azureSubscription: $(azureSubscription)
+              addSpnToEnvironment: true
+              inlineScript: |
+                # variables
+                subscriptionName=$(az account show --query name --output tsv)
+
+                # Allow installing Azure CLI extensions without prompt
+                az config set extension.use_dynamic_install=yes_without_prompt
+
+                # Check if the cluster issuer already exists
+                result=$(kubectl get clusterissuer -n $(clusterIssuerNamespace) -o jsonpath="{.items[?(@.metadata.name=='$(clusterIssuerName)')].metadata.name}")
+
+                if [[ -n $result ]]; then
+                    echo "[$(clusterIssuerName)] cluster issuer already exists"
+                    exit
+                fi
+
+                # Create template
+                cat <<EOF > template.yaml
+                apiVersion: cert-manager.io/v1
+                kind: ClusterIssuer
+                metadata:
+                  name: letsencrypt-nginx
+                spec:
+                  acme:
+                    server: https://acme-v02.api.letsencrypt.org/directory
+                    email: $(clusterIssuerEmail)
+                    privateKeySecretRef:
+                      name: letsencrypt
+                    solvers:
+                    - http01:
+                        ingress:
+                          class: nginx
+                          podTemplate:
+                            spec:
+                              nodeSelector:
+                                "kubernetes.io/os": linux
+                EOF
+
+                # Print template
+                cat template.yaml
+
+                # Create the cluster issuer 
+                echo "[$(clusterIssuerName)] cluster issuer does not exist"
+                echo "Creating [$(clusterIssuerName)] cluster issuer..."
+                kubectl apply -n $(clusterIssuerNamespace) -f template.yaml
+          - task: AzureCLI@2
+            displayName: 'Deploy NGINX Ingress Controller'
+            inputs:
+              scriptType: bash
+              scriptLocation: inlineScript
+              azureSubscription: $(azureSubscription)
+              addSpnToEnvironment: true
+              inlineScript: |
+                # variables
+                subscriptionName=$(az account show --query name --output tsv)
+
+                # Allow installing Azure CLI extensions without prompt
+                az config set extension.use_dynamic_install=yes_without_prompt
+
+                # Check if the repository is not already added
+                result=$(helm repo list | grep $(nginxRepoName) | awk '{print $1}')
+
+                if [[ -n $result ]]; then
+                  echo "[$(nginxRepoName)] Helm repo already exists"
+                else
+                    # Add the repository
+                  echo "Adding [$(nginxRepoName)] Helm repo..."
+                  helm repo add $(nginxRepoName) $(nginxRepoUrl)
+                fi
+
+                # Check if NGINX ingress controller release already exists
+                result=$(helm list -n $(nginxNamespace) | grep $(nginxReleaseName) | awk '{print $1}')
+
+                if [[ -n $result ]]; then
+                  echo "[$(nginxReleaseName)] release already exists in the [$(nginxNamespace)] namespace"
+                else
+                  # Deploy NGINX ingress controller
+                  echo "Deploying [$(nginxReleaseName)] release to the [$(nginxNamespace)] namespace..."
+                  helm install $(nginxReleaseName) $(nginxRepoName)/$(nginxChartName) \
+                      --namespace $(nginxNamespace) \
+                      --create-namespace \
+                      --set controller.replicaCount=$replicaCount \
+                      --set controller.nodeSelector."kubernetes\.io/os"=linux \
+                      --set controller.admissionWebhooks.patch.nodeSelector."kubernetes\.io/os"=linux \
+                      --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-internal"=true
+                      --set defaultBackend.nodeSelector."kubernetes\.io/os"=linux
+                fi
+
+                # Retrieve the name of the ingress conntroller service
+                nginxServiceName=$(kubectl get svc -n $(nginxNamespace) | grep LoadBalancer | awk '{print $1}')
+
+                if [[ -n $nginxServiceName ]]; then
+                  echo "[$nginxServiceName] ingress controller service name successfully retrieved"
+                else
+                    # Add the repository
+                  echo "Failed to retrieve the ingress controller service name"
+                  exit -1
+                fi
+
+                echo "Retrieving the external IP address from the NGINX ingress controller..."
+                for ((i = 0; i < $(maxretries); i++)); do
+                  externalIpAddress=$(kubectl get service $nginxServiceName -n $(nginxNamespace) -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+                  if [[ -n $externalIpAddress ]]; then
+                      if [[ $i > 0 ]]; then
+                          echo ''
+                      fi
+                      echo "[$externalIpAddress] external IP address successfully retrieved from the NGINX ingress controller"
+                      break
+                  else
+                      echo -n "."
+                      sleep $(sleepInterval)
+                  fi
+                done
+
+                if [[ -n $externalIpAddress ]]; then
+                  echo "##vso[task.setvariable variable=externalIpAddress;]$externalIpAddress"
+                else
+                  echo "Failed to retrieve the external IP address from the NGINX ingress controller"
+                  exit -1
+                fi
+          - task: AzureCLI@2
+            displayName: 'Configure Firewall and Route Table'
+            inputs:
+              scriptType: bash
+              scriptLocation: inlineScript
+              azureSubscription: $(azureSubscription)
+              addSpnToEnvironment: true
+              inlineScript: |
+                # variables
+                subscriptionName=$(az account show --query name --output tsv)
+
+                # Create resource group for public IP addresses
+                echo "Checking if [$(publicIpAddressResourceGroupName)] resource group actually exists in the [$subscriptionName] subscription..."
+                az group show --name $(publicIpAddressResourceGroupName) &>/dev/null
+
+                if [[ $? != 0 ]]; then
+                  echo "No [$(publicIpAddressResourceGroupName)] resource group actually exists in the [$subscriptionName] subscription"
+                  echo "Creating [$(publicIpAddressResourceGroupName)] resource group in the [$subscriptionName] subscription..."
+
+                  # Create the resource group
+                  az group create \
+                    --name $(publicIpAddressResourceGroupName) \
+                    --location $(location) 1>/dev/null
+
+                  if [[ $? == 0 ]]; then
+                    echo "[$(publicIpAddressResourceGroupName)] resource group successfully created in the [$subscriptionName] subscription"
+                  else
+                    echo "Failed to create [$(publicIpAddressResourceGroupName)] resource group in the [$subscriptionName] subscription"
+                    exit -1
+                  fi
+                else
+                  echo "[$(publicIpAddressResourceGroupName)] resource group already exists in the [$subscriptionName] subscription"
+                fi
+
+                # Create prefix
+                s1=$(aksName)
+                s2=$(workloadNamespace)
+                s3=$(workloadReleaseName)
+                prefix="${s1^}_${s2^}_${s3^}"
+
+                # Create public IP address
+                firewallPublicIpName="${prefix}_PublicIp"
+                echo "Checking if [$firewallPublicIpName] public IP already exists in the [$(publicIpAddressResourceGroupName)] resource group..."
+                
+                az network public-ip show \
+                  --name $firewallPublicIpName \
+                  --resource-group $(publicIpAddressResourceGroupName) &>/dev/null
+                
+                if [[ $? != 0 ]]; then
+                  echo "No [$firewallPublicIpName] public IP exists in the [$(publicIpAddressResourceGroupName)] resource group"
+                  echo "Creating [$firewallPublicIpName] public IP in the [$(publicIpAddressResourceGroupName)] resource group..."
+                  
+                  az network public-ip create \
+                    --name $firewallPublicIpName \
+                    --resource-group $(publicIpAddressResourceGroupName) \
+                    --location $(location) \
+                    --sku Standard \
+                    --allocation-method Static \
+                    --zone 1 2 3 \
+                    --tags serviceName=$(workloadReleaseName) namespace=$(namespace) cluster=$(aksName) 1>/dev/null
+
+                  if [[ $? == 0 ]]; then
+                    echo "[$firewallPublicIpName] public IP successfully created in the [$(publicIpAddressResourceGroupName)] resource group"
+                  else
+                    echo "Failed to create [$firewallPublicIpName] public IP in the [$(publicIpAddressResourceGroupName)] resource group"
+                    exit -1
+                  fi
+                else
+                  echo "[$firewallPublicIpName] public IP already exists in the [$(publicIpAddressResourceGroupName)] resource group"
+                fi
+
+                # Get the resource id of the Public IP
+                echo "Retrieving the resource id of the [$firewallPublicIpName] public IP"
+                firewallPublicIpId=$(az network public-ip show \
+                  --name $firewallPublicIpName \
+                  --resource-group $(publicIpAddressResourceGroupName) \
+                  --query id \
+                  --output tsv)
+                
+                if [[ -n $firewallPublicIpId ]]; then
+                  echo "Resource id of the [$firewallPublicIpName] public IP successfully retrieved:"
+                  echo $firewallPublicIpId
+                else
+                  echo "Failed to retrieve the resource id of the [$firewallPublicIpName] public IP"
+                  exit -1
+                fi
+
+                # Get the address of the public IP
+                echo "Retrieving the address of the [$firewallPublicIpName] public IP..."
+
+                firewallPublicIpAddress=$(az network public-ip show \
+                  --name $firewallPublicIpName \
+                  --resource-group $(publicIpAddressResourceGroupName) \
+                  --query ipAddress \
+                  --output tsv 2>/dev/null)
+
+                if [[ -n $firewallPublicIpAddress ]]; then
+                  echo "[$firewallPublicIpAddress] address of the [$firewallPublicIpName] public IP successfully retrieved"
+                  echo "##vso[task.setvariable variable=firewallPublicIpAddress;]$firewallPublicIpAddress"
+                else
+                  echo "Failed to retrieve the address of the [$firewallPublicIpName]"
+                  exit -1
+                fi
+
+                # Create firewall Ip configuration with the new public Ip address
+                firewallIpConfig="${prefix}_Config"
+                echo "Checking if [$firewallIpConfig] firewall IP configuration already exists in the [$(firewallName)] firewall..."
+                
+                az network firewall ip-config show \
+                  --name $firewallIpConfig \
+                  --firewall-name $(firewallName) \
+                  --resource-group $(resourceGroupName) &>/dev/null
+                
+                if [[ $? != 0 ]]; then
+                  echo "No [$firewallIpConfig] firewall IP configuration exists in the [$(firewallName)] firewall"
+                  echo "Creating [$firewallIpConfig] firewall IP configuration in the [$(firewallName)] firewall..."
+
+                  az network firewall ip-config create \
+                    --name $firewallIpConfig \
+                    --firewall-name $(firewallName) \
+                    --public-ip-address $firewallPublicIpId \
+                    --resource-group $(resourceGroupName) 1>/dev/null
+
+                  if [[ $? == 0 ]]; then
+                    echo "[$firewallIpConfig] firewall IP configuration successfully created in the [$(firewallName)] firewall"
+                  else
+                    echo "Failed to create [$firewallIpConfig] firewall IP configuration the [$(firewallName)] firewall"
+                    exit -1
+                  fi
+                else
+                  echo "[$firewallIpConfig] firewall IP configuration already exists in the [$(firewallName)] firewall"
+                fi
+
+                # Check if the rule collection exists
+                echo "Checking if [$(dnatRuleCollectionName)] DNAT rule collection already exists in the [$(firewallPolicyName)] firewall policy..."
+                col=$(dnatRuleCollectionName)
+                collectionName=$(az network firewall policy rule-collection-group collection list \
+                  --policy-name $(firewallPolicyName) \
+                  --rule-collection-group-name $(ruleCollectionGroupName) \
+                  --resource-group $(resourceGroupName) \
+                  --query "[?name=='"$col"'].name" \
+                  --output tsv)
+                
+                if [[ -z $collectionName ]]; then
+                  echo "No [$(dnatRuleCollectionName)] DNAT rule collection exists in the [$(firewallPolicyName)] firewall policy"
+                  echo "Creating [$(dnatRuleCollectionName)] DNAT rule collection in the [$(firewallPolicyName)] firewall policy..."
+
+                  az network firewall policy rule-collection-group collection add-filter-collection --collection-priority \
+                    --name $(dnatRuleCollectionName) \
+                    --policy-name $(firewallPolicyName) \
+                    --rule-collection-group-name $(ruleCollectionGroupName) \
+                    --resource-group $(resourceGroupName) \
+                    --action Allow \
+                    --rule-type NatRule \
+                    --collection-priority 100 1>/dev/null
+
+                  if [[ $? == 0 ]]; then
+                    echo "[$(dnatRuleCollectionName)] DNAT rule collection successfully created in the [$(firewallPolicyName)] firewall policy"
+                  else
+                    echo "Failed to create [$(dnatRuleCollectionName)] DNAT rule collection in the [$(firewallPolicyName)] firewall policy"
+                    exit -1
+                  fi
+                else
+                  echo "[$(dnatRuleCollectionName)] DNAT rule collection already exists in the [$(firewallPolicyName)] firewall policy"
+                fi
+
+                # Create DNAT rule in the Firewall Policy
+                dnatRuleName="${prefix}_Rule_Https"
+                echo "Creating [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy..."
+
+                az network firewall policy rule-collection-group collection rule add \
+                  --policy-name $(firewallPolicyName) \
+                  --resource-group $(resourceGroupName) \
+                  --rule-collection-group-name $(ruleCollectionGroupName) \
+                  --collection-name $(dnatRuleCollectionName) \
+                  --name $dnatRuleName \
+                  --rule-type NatRule \
+                  --destination-addresses $firewallPublicIpAddress \
+                  --destination-ports 443 \
+                  --ip-protocols TCP \
+                  --source-addresses '*' \
+                  --translated-port 443 \
+                  --translated-address $(externalIpAddress) 1>/dev/null
+              
+                if [[ $? == 0 ]]; then
+                  echo "[$dnatRuleName] DNAT rule successfully created in the [$(firewallPolicyName)] firewall policy"
+                else
+                  echo "Failed to create [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy"
+                  exit -1
+                fi
+
+                # Create DNAT rule in the Firewall Policy on port 80 for LetsEncrypt
+                # Let's encrypt needs to have access to your application to prove that you are the owner of the domain. 
+                # Once this is achieved your certificate object will change it status to True.
+                dnatRuleName="${prefix}_Rule_Http"
+                echo "Creating [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy..."
+
+                az network firewall policy rule-collection-group collection rule add \
+                  --policy-name $(firewallPolicyName) \
+                  --resource-group $(resourceGroupName) \
+                  --rule-collection-group-name $(ruleCollectionGroupName) \
+                  --collection-name $(dnatRuleCollectionName) \
+                  --name $dnatRuleName \
+                  --rule-type NatRule \
+                  --destination-addresses $firewallPublicIpAddress \
+                  --destination-ports 80 \
+                  --ip-protocols TCP \
+                  --source-addresses '*' \
+                  --translated-port 80 \
+                  --translated-address $(externalIpAddress) 1>/dev/null
+              
+                if [[ $? == 0 ]]; then
+                  echo "[$dnatRuleName] DNAT rule successfully created in the [$(firewallPolicyName)] firewall policy"
+                else
+                  echo "Failed to create [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy"
+                  exit -1
+                fi
+          - task: AzureCLI@2
+            displayName: 'Configure DNS'
+            inputs:
+              scriptType: bash
+              scriptLocation: inlineScript
+              azureSubscription: $(azureSubscription)
+              addSpnToEnvironment: true
+              inlineScript: |
+                # Check if an A record for the subdomain exists in the DNS Zone
+                echo "Retrieving the A record for the [$(subdomain)] subdomain from the [$(domain)] DNS zone..."
+                ipv4Address=$(az network dns record-set a list \
+                    --zone-name $(domain) \
+                    --resource-group $(dnsZoneResourceGroupName) \
+                    --query "[?name=='$(subdomain)'].arecords[].ipv4Address" \
+                    --output tsv)
+
+                if [[ -n $ipv4Address ]]; then
+                    echo "An A record already exists in [$(domain)] DNS zone for the [$(subdomain)] subdomain with [$ipv4Address] IP address"
+
+                    if [[ $ipv4Address == $(firewallPublicIpAddress) ]]; then
+                        echo "The [$ipv4Address] ip address of the existing A record is equal to the ip address of the [$ingressName] ingress"
+                        echo "No additional step is required"
+                        exit
+                    else
+                        echo "The [$ipv4Address] ip address of the existing A record is different than the ip address of the [$ingressName] ingress"
+                    fi
+
+                    # Retrieving name of the record set relative to the zone
+                    echo "Retrieving the name of the record set relative to the [$(domain)] zone..."
+
+                    recordSetName=$(az network dns record-set a list \
+                        --zone-name $(domain) \
+                        --resource-group $(dnsZoneResourceGroupName) \
+                        --query "[?name=='$(subdomain)'].name" \
+                        --output name 2>/dev/null)
+
+                    if [[ -n $recordSetName ]]; then
+                        "[$recordSetName] record set name successfully retrieved"
+                    else
+                        "Failed to retrieve the name of the record set relative to the [$(domain)] zone"
+                        exit
+                    fi
+
+                    # Remove the a record
+                    echo "Removing the A record from the record set relative to the [$(domain)] zone..."
+
+                    az network dns record-set a remove-record \
+                        --ipv4-address $ipv4Address \
+                        --record-set-name $recordSetName \
+                        --zone-name $(domain) \
+                        --resource-group $(dnsZoneResourceGroupName) \
+
+                    if [[ $? == 0 ]]; then 
+                        echo "[$ipv4Address] ip address successfully removed from the [$recordSetName] record set"
+                    else
+                        echo "Failed to remove the [$ipv4Address] ip address from the [$recordSetName] record set"
+                        exit
+                    fi
+                fi
+
+                # Create the a record    
+                echo "Creating an A record in [$(domain)] DNS zone for the [$(subdomain)] subdomain with [$(firewallPublicIpAddress)] IP address..."
+                az network dns record-set a add-record \
+                    --zone-name $(domain) \
+                    --resource-group $(dnsZoneResourceGroupName) \
+                    --record-set-name $(subdomain) \
+                    --ipv4-address $(firewallPublicIpAddress) 1>/dev/null
+
+                if [[ $? == 0 ]]; then
+                    echo "A record for the [$(subdomain)] subdomain with [$(firewallPublicIpAddress)] IP address successfully created in [$(domain)] DNS zone"
+                else
+                    echo "Failed to create an A record for the $(subdomain) subdomain with [$(firewallPublicIpAddress)] IP address in [$(domain)] DNS zone"
+                fi
+          - task: AzureCLI@2
+            displayName: 'Deploy Workload'
+            inputs:
+              scriptType: bash
+              scriptLocation: inlineScript
+              azureSubscription: $(azureSubscription)
+              addSpnToEnvironment: true
+              inlineScript: |
+                # variables
+                subscriptionName=$(az account show --query name --output tsv)
+
+                # Allow installing Azure CLI extensions without prompt
+                az config set extension.use_dynamic_install=yes_without_prompt
+
+                # Login to ACR
+                az acr login --name $(acrName) 
+
+                # Retrieve ACR login server. Each container image needs to be tagged with the loginServer name of the registry. 
+                echo "Logging to [$(acrName)] Azure Container Registry..."
+                loginServer=$(az acr show --name $(acrName) --query loginServer --output tsv)
+
+                 # Login to ACR via Helm
+                token=$(az acr login --name $(acrName) --expose-token --output tsv --query accessToken)
+                echo $token | helm registry login $loginServer \
+                  --username 00000000-0000-0000-0000-000000000000 \
+                  --password-stdin
+
+                # Helm pull
+                echo "Deleting [$(workloadChartName)] directory if a directory with the same name already exists..."
+                if [ -d $(workloadChartName) ]; then 
+                  rm -Rf $(workloadChartName)
+                fi
+
+                echo "Pulling [oci://$loginServer/helm/$(workloadChartName)]..."
+                helm pull oci://$loginServer/helm/$(workloadChartName) --version $(workloadChartVersion) --untar
+
+                # Check if the workload release already exists
+                result=$(helm list -n $(workloadNamespace) | grep $(workloadReleaseName) | awk '{print $1}')
+                dns="$(subdomain).$(domain)"
+
+                if [[ -n $result ]]; then
+                  echo "A [$(workloadReleaseName)] Helm release already exists in the [$(workloadNamespace)] namespace"
+                  echo "Upgrading [$(workloadChartName)] Helm chart in the [$(workloadReleaseName)] Helm release..."
+
+                  # Install Helm chart
+                  helm upgrade \
+                    --namespace $(workloadNamespace) \
+                    --create-namespace \
+                    --install \
+                    --wait \
+                    --timeout 30m \
+                    --set image.repository=$loginServer/$(imageName) \
+                    --set image.tag=$(imageTag) \
+                    --set livenessProbe.initialDelaySeconds=300 \
+                    --set readinessProbe.initialDelaySeconds=300 \
+                    --set startupProbe.initialDelaySeconds=600 \
+                    --set ingress.annotations."kubernetes\.io/ingress\.class"=nginx \
+                    --set ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-nginx \
+                    --set ingress.tls[0].hosts[0]=$dns \
+                    --set ingress.hosts[0].host=$dns \
+                    --version $(workloadChartVersion) \
+                    $(workloadReleaseName) ./$(workloadChartName)
+                else
+                  echo "No [$(workloadReleaseName)] Helm release exists in the [$(workloadNamespace)] namespace"
+                  echo "Installing [$(workloadChartName)] Helm chart to [$(workloadReleaseName)] Helm release..."
+
+                  # Install Helm chart
+                  helm install \
+                    --namespace $(workloadNamespace) \
+                    --create-namespace \
+                    --wait \
+                    --timeout 30m \
+                    --set image.repository=$loginServer/$(imageName) \
+                    --set image.tag=$(imageTag) \
+                    --set livenessProbe.initialDelaySeconds=300 \
+                    --set readinessProbe.initialDelaySeconds=300 \
+                    --set startupProbe.initialDelaySeconds=600 \
+                    --set ingress.annotations."kubernetes\.io/ingress\.class"=nginx \
+                    --set ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-nginx \
+                    --set ingress.tls[0].hosts[0]=$dns \
+                    --set ingress.hosts[0].host=$dns \
+                    --version $(workloadChartVersion) \
+                    $(workloadReleaseName) ./$(workloadChartName)
+                fi
+
+                if  [[ $? == 0 ]]; then
+                  echo "Successfully installed [$(workloadChartName)] Helm chart to [$(workloadReleaseName)] Helm release"
+                else
+                  echo "Failed to install [$(workloadChartName)] Helm chart to [$(workloadReleaseName)] Helm release"
+                  exit -1
+                fi

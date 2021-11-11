@@ -1,0 +1,135 @@
+trigger:
+  batch: true
+  branches:
+    include: 
+    - '*'
+  paths:
+    include: 
+    - src
+
+pr: none
+pool: Terraform
+
+variables:
+- group: global-variables
+- name: azureSubscription
+  value: AzureSubscription
+- name: sourcePath
+  value: source
+- name: helmChartPath
+  value: chart
+- name: helmVersion
+  value: latest
+- name: kubectlVersion
+  value: latest
+- name: chartName
+  value: syntheticapi
+- name: HELM_EXPERIMENTAL_OCI
+  value: 1
+
+stages :
+- stage: create_container_image
+  displayName: Create Image
+  jobs:
+  - job: create_container_image
+    displayName: 'Build Image'
+    steps:
+    - bash: |
+        # Set ACR name lowercase
+        acrName=$(echo $(registryServerName) | awk '{print tolower($0)}')
+        echo "##vso[task.setvariable variable=acrName;]$acrName"
+      failOnStderr: true
+      displayName: 'ACR Name ToLower'
+    - task: HelmInstaller@1
+      displayName: 'Install Helm'
+      enabled: false
+      inputs:
+        helmVersionToInstall: $(helmVersion)
+    - task: KubectlInstaller@0
+      displayName: 'Install Kubectl'
+      enabled: false
+      inputs:
+        kubectlVersion: $(kubectlVersion)
+    - task: AzureCLI@2
+      displayName: 'Container Image Build and Push'
+      condition: succeeded()
+      inputs:
+        scriptType: bash
+        scriptLocation: inlineScript
+        azureSubscription: $(azureSubscription)
+        addSpnToEnvironment: true
+        inlineScript: |
+          # Login to ACR
+          az acr login --name $(acrName) 
+
+          # Retrieve ACR login server. Each container image needs to be tagged with the loginServer name of the registry. 
+          echo "Logging to [$(acrName)] Azure Container Registry..."
+          loginServer=$(az acr show --name $(acrName) --query loginServer --output tsv)
+
+          cd $(sourcePath)
+          echo "Building [$loginServer/$(imageName):$(imageTag)] container image..."
+          docker build -t $loginServer/$(imageName):$(imageTag) .
+
+          # Push local container image to ACR
+          docker push $loginServer/$(imageName):$(imageTag)
+    - bash: |
+        # Run helm package
+        helm package \
+          --app-version $(imageTag) \
+          $(helmChartPath)
+      failOnStderr: true
+      displayName: 'Helm Package'
+    - bash: |
+        # Run helm lint
+        helm lint $(helmChartPath)
+      failOnStderr: false
+      displayName: 'Helm Lint'
+    - task: AzureCLI@2
+      displayName: 'Helm Chart Push'
+      condition: succeeded()
+      env:
+        AZURE_DEVOPS_EXT_PAT: $(System.AccessToken)
+      inputs:
+        scriptType: bash
+        scriptLocation: inlineScript
+        azureSubscription: $(azureSubscription)
+        addSpnToEnvironment: true
+        inlineScript: |
+          # Login to ACR
+          az acr login --name $(acrName) 
+
+          # Retrieve ACR login server. Each container image needs to be tagged with the loginServer name of the registry. 
+          echo "Logging to [$(acrName)] Azure Container Registry..."
+          loginServer=$(az acr show --name $(acrName) --query loginServer --output tsv)
+
+          # Login to ACR via Helm
+          token=$(az acr login --name $(acrName) --expose-token --output tsv --query accessToken)
+          echo $token | helm registry login $loginServer \
+            --username 00000000-0000-0000-0000-000000000000 \
+            --password-stdin
+
+          # Package helm chart
+          echo "Creating helm package..."
+          packageFile=`helm package $(helmChartPath) | awk -F ': ' '{print $2}'`
+          
+          if [[ -n $packageFile ]]; then
+            echo "[$packageFile] helm package successfully created"
+          else
+            echo "Failed to create [$packageFile] helm package"
+            exit -1-
+          fi
+
+          # Get helm chart version
+          echo "Retrieving helm chart version..."
+          chartVersion=$(helm show chart $packageFile | grep version | awk -F ': ' '{print $2}')
+
+          if [[ -n $chartVersion ]]; then
+            echo "[$chartVersion] helm chart version successfully retrieved"
+          else
+            echo "Failed to retrieve [$chartVersion] helm chart version"
+            exit -1
+          fi
+          
+          # Push helm chart to ACR
+          echo "Pushing [$packageFile] to oci://$loginServer/helm..."
+          helm push $packageFile oci://$loginServer/helm
