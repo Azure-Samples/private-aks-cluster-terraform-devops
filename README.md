@@ -5,6 +5,7 @@ languages:
 - bash
 - javascript
 - terraform
+- csharp
 products:
 - azure
 - azure-firewall
