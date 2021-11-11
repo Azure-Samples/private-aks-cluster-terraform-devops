@@ -1,0 +1,75 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+<div>
+    <h4>Properties</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>
+                    Property
+                </th>
+                <th>
+                    Value
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    @Html.DisplayNameFor(modelItem => modelItem.MachineName)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => modelItem.MachineName)
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    @Html.DisplayNameFor(modelItem => modelItem.Path)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => modelItem.Path)
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    @Html.DisplayNameFor(modelItem => modelItem.IsHttps)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => modelItem.IsHttps)
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <h4>Headers</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>
+                    @Html.DisplayNameFor(modelItem => modelItem.Headers.First().Key)
+                </th>
+                <th>
+                    @Html.DisplayNameFor(modelItem => modelItem.Headers.First().Value)
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var header in Model.Headers)
+            {
+                <tr>
+                    <td>
+                        @Html.DisplayFor(modelItem => header.Key)
+                    </td>
+                    <td>
+                        @Html.DisplayFor(modelItem => header.Value[0])
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+
+

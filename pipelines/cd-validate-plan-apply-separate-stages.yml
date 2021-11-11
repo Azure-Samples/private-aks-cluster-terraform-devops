@@ -414,7 +414,7 @@ stages :
         azureSubscription: $(azureSubscription)
         addSpnToEnvironment: true
         inlineScript: |
-          version=$(az aks get-versions --location $(location) --query orchestrators[-1].orchestratorVersion --output tsv)
+          version=$(az aks get-versions --location $(location) --query "orchestrators[?isPreview==false].orchestratorVersion | sort(@) | [-1]" --output tsv)
           echo "##vso[task.setvariable variable=kubernetesVersion;]$version"
     - task: TerraformInstaller@0
       displayName: 'Terraform Install'
