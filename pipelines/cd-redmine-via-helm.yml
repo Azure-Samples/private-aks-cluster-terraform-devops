@@ -349,6 +349,7 @@ stages :
                   --destination-ports $(destinationPort) \
                   --ip-protocols TCP \
                   --source-addresses '*' \
+                  --translated-fqdn """""" \
                   --translated-port $(translatedPort) \
                   --translated-address $serviceExternalIpAddress 1>/dev/null
               
