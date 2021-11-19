@@ -478,56 +478,79 @@ stages :
 
                 # Create DNAT rule in the Firewall Policy
                 dnatRuleName="${prefix}_Rule_Https"
-                echo "Creating [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy..."
-
-                az network firewall policy rule-collection-group collection rule add \
+                echo "Checking if [$dnatRuleName] DNAT rule already exists in the [$(firewallPolicyName)] firewall policy..."
+                name=$(az network firewall policy rule-collection-group collection list \
                   --policy-name $(firewallPolicyName) \
                   --resource-group $(resourceGroupName) \
                   --rule-collection-group-name $(ruleCollectionGroupName) \
-                  --collection-name $(dnatRuleCollectionName) \
-                  --name $dnatRuleName \
-                  --rule-type NatRule \
-                  --destination-addresses $firewallPublicIpAddress \
-                  --destination-ports 443 \
-                  --ip-protocols TCP \
-                  --source-addresses '*' \
-                  --translated-fqdn """""" \
-                  --translated-port 443 \
-                  --translated-address $(externalIpAddress) 1>/dev/null
-              
-                if [[ $? == 0 ]]; then
-                  echo "[$dnatRuleName] DNAT rule successfully created in the [$(firewallPolicyName)] firewall policy"
+                  --query "[0].rules[?name=='$dnatRuleName']".name \
+                  --output tsv)
+
+                if [[ -z $name ]]; then
+                  echo "Creating [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy..."
+                  az network firewall policy rule-collection-group collection rule add \
+                    --policy-name $(firewallPolicyName) \
+                    --resource-group $(resourceGroupName) \
+                    --rule-collection-group-name $(ruleCollectionGroupName) \
+                    --collection-name $(dnatRuleCollectionName) \
+                    --name $dnatRuleName \
+                    --rule-type NatRule \
+                    --destination-addresses $firewallPublicIpAddress \
+                    --destination-ports 443 \
+                    --ip-protocols TCP \
+                    --source-addresses '*' \
+                    --translated-fqdn """""" \
+                    --translated-port 443 \
+                    --translated-address $(externalIpAddress) 1>/dev/null
+                
+                  if [[ $? == 0 ]]; then
+                    echo "[$dnatRuleName] DNAT rule successfully created in the [$(firewallPolicyName)] firewall policy"
+                  else
+                    echo "Failed to create [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy"
+                    exit -1
+                  fi
                 else
-                  echo "Failed to create [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy"
-                  exit -1
+                  echo "[$dnatRuleName] DNAT rule already exists in the [$(firewallPolicyName)] firewall policy"
                 fi
 
                 # Create DNAT rule in the Firewall Policy on port 80 for LetsEncrypt
                 # Let's encrypt needs to have access to your application to prove that you are the owner of the domain. 
                 # Once this is achieved your certificate object will change it status to True.
                 dnatRuleName="${prefix}_Rule_Http"
-                echo "Creating [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy..."
-
-                az network firewall policy rule-collection-group collection rule add \
+                echo "Checking if [$dnatRuleName] DNAT rule already exists in the [$(firewallPolicyName)] firewall policy..."
+                name=$(az network firewall policy rule-collection-group collection list \
                   --policy-name $(firewallPolicyName) \
                   --resource-group $(resourceGroupName) \
                   --rule-collection-group-name $(ruleCollectionGroupName) \
-                  --collection-name $(dnatRuleCollectionName) \
-                  --name $dnatRuleName \
-                  --rule-type NatRule \
-                  --destination-addresses $firewallPublicIpAddress \
-                  --destination-ports 80 \
-                  --ip-protocols TCP \
-                  --source-addresses '*' \
-                  --translated-fqdn """""" \
-                  --translated-port 80 \
-                  --translated-address $(externalIpAddress) 1>/dev/null
-              
-                if [[ $? == 0 ]]; then
-                  echo "[$dnatRuleName] DNAT rule successfully created in the [$(firewallPolicyName)] firewall policy"
+                  --query "[0].rules[?name=='$dnatRuleName']".name \
+                  --output tsv)
+
+                if [[ -z $name ]]; then
+                  echo "Creating [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy..."
+
+                  az network firewall policy rule-collection-group collection rule add \
+                    --policy-name $(firewallPolicyName) \
+                    --resource-group $(resourceGroupName) \
+                    --rule-collection-group-name $(ruleCollectionGroupName) \
+                    --collection-name $(dnatRuleCollectionName) \
+                    --name $dnatRuleName \
+                    --rule-type NatRule \
+                    --destination-addresses $firewallPublicIpAddress \
+                    --destination-ports 80 \
+                    --ip-protocols TCP \
+                    --source-addresses '*' \
+                    --translated-fqdn """""" \
+                    --translated-port 80 \
+                    --translated-address $(externalIpAddress) 1>/dev/null
+                
+                  if [[ $? == 0 ]]; then
+                    echo "[$dnatRuleName] DNAT rule successfully created in the [$(firewallPolicyName)] firewall policy"
+                  else
+                    echo "Failed to create [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy"
+                    exit -1
+                  fi
                 else
-                  echo "Failed to create [$dnatRuleName] DNAT rule in the [$(firewallPolicyName)] firewall policy"
-                  exit -1
+                  echo "[$dnatRuleName] DNAT rule already exists in the [$(firewallPolicyName)] firewall policy"
                 fi
           - task: AzureCLI@2
             displayName: 'Configure DNS'

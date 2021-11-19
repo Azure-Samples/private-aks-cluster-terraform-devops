@@ -52,7 +52,11 @@ In addition, the sample creates a private endpoint to access all the managed ser
 
 ## Architecture ##
 
-The following picture shows the architecture created by the Terraform modules included in this sample:
+The following picture shows the high-level architecture created by the Terraform modules included in this sample:
+
+![Architecture](images/normalized-architecture.png)
+
+The following picture provides a more detailed view of the infrastructure on Azure.
 
 ![Architecture](images/overall-architecture.png)
 
@@ -270,9 +274,6 @@ Likewise, the [destroy-redmine-via-helm](./pipelines/destroy-redmine-via-helm.ym
   - Uses the [az network route-table route delete](https://docs.microsoft.com/en-us/cli/azure/network/route-table/route?view=azure-cli-latest#az_network_route_table_route_delete) command to delete the user-defined route called `AksName_HelmReleaseNamespace_ServiceName` from the Azure Route Table associated to the subnets hosting the node pools of the AKDS cluster.
   - Uses the [az network firewall ip-config delete](https://docs.microsoft.com/en-us/cli/azure/network/firewall/ip-config?view=azure-cli-latest#az_network_firewall_ip_config_delete) command to delete the Azure Firewall IP configuration called `AksName_HelmReleaseNamespace_ServiceName` used to expose the redmine Kubernetes service.
   - Uses the [az network public-ip delete](https://docs.microsoft.com/en-us/cli/azure/network/public-ip?view=azure-cli-latest#az_network_public_ip_delete) command to destroy the Azure Public IP called `AksName_HelmReleaseNamespace_ServiceName` used to expose the redmine Kubernetes service.
-
-> **NOTE**  
-> At the moment the [az network firewall policy rule-collection-group collection rule add](https://docs.microsoft.com/en-us/cli/azure/network/firewall/policy/rule-collection-group/collection/rule?view=azure-cli-latest#az_network_firewall_policy_rule_collection_group_collection_rule_add) is affected by an issue that may prevent the DNAT rule to work as expected. In this case, delete and re-create the rule manually in the rule collection panel of the Azure Firewall Policy using the Azure Portal.
 
 ## API Gateway ##
 
