@@ -3,6 +3,12 @@ variable "name" {
   type        = string
 }
 
+variable "sku_tier" {
+  description = "Specifies the firewall sku tier"
+  default     = "Standard"
+  type        = string
+}
+
 variable "resource_group_name" {
   description = "Specifies the resource group name"
   type        = string

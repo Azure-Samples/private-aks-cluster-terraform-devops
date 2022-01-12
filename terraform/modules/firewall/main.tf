@@ -30,6 +30,7 @@ resource "azurerm_firewall" "firewall" {
   tags                = var.tags
   zones               = var.zones
   threat_intel_mode   = var.threat_intel_mode
+  sku_tier            = var.sku_tier
   firewall_policy_id  = azurerm_firewall_policy.policy.id
 
 

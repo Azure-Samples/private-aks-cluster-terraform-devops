@@ -115,6 +115,7 @@ module "firewall" {
   zones                        = var.firewall_zones
   threat_intel_mode            = var.firewall_threat_intel_mode
   location                     = var.location
+  sku_tier                     = var.firewall_sku_tier
   pip_name                     = "${var.firewall_name}PublicIp"
   subnet_id                    = module.hub_network.subnet_ids["AzureFirewallSubnet"]
   log_analytics_workspace_id   = module.log_analytics_workspace.id

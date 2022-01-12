@@ -367,6 +367,12 @@ variable "firewall_name" {
   type        = string
 }
 
+variable "firewall_sku_tier" {
+  description = "Specifies the SKU tier of the Azure Firewall"
+  default     = "Standard"
+  type        = string
+}
+
 variable "firewall_threat_intel_mode" {
   description = "(Optional) The operation mode for threat intelligence-based filtering. Possible values are: Off, Alert, Deny. Defaults to Alert."
   default     = "Alert"
