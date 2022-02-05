@@ -62,7 +62,7 @@ The following picture provides a more detailed view of the infrastructure on Azu
 
 The architecture is composed of the following elements:
 
-- A hub virtual network with three subnets:
+- A hub virtual network with two subnets:
   - AzureBastionSubnet used by Azure Bastion
   - AzureFirewallSubnet used by Azure Firewall
 - A new virtual network with three subnets:
