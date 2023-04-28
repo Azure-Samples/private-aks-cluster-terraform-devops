@@ -12,6 +12,7 @@ resource "azurerm_public_ip" "pip" {
   name                = var.pip_name
   resource_group_name = var.resource_group_name
   location            = var.location
+  zones               = var.zones
   allocation_method   = "Static"
   sku                 = "Standard"
   tags                = var.tags
@@ -25,13 +26,14 @@ resource "azurerm_public_ip" "pip" {
 
 resource "azurerm_firewall" "firewall" {
   name                = var.name
-  location            = var.location
   resource_group_name = var.resource_group_name
-  tags                = var.tags
+  location            = var.location
   zones               = var.zones
   threat_intel_mode   = var.threat_intel_mode
+  sku_name            = var.sku_name
   sku_tier            = var.sku_tier
   firewall_policy_id  = azurerm_firewall_policy.policy.id
+  tags                = var.tags
 
 
   ip_configuration {

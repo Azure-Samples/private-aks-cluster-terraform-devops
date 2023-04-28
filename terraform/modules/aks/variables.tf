@@ -87,12 +87,6 @@ variable "default_node_pool_availability_zones" {
   type        = list(string)
 }
 
-variable "network_docker_bridge_cidr" {
-  description = "Specifies the Docker bridge CIDR"
-  default     = "172.17.0.1/16"
-  type        = string
-}
-
 variable "network_dns_service_ip" {
   description = "Specifies the DNS service IP"
   default     = "10.2.0.10"
@@ -221,6 +215,12 @@ variable "vnet_subnet_id" {
   type        = string
 }
 
+variable "pod_subnet_id" {
+  description = "(Optional) The ID of the Subnet where the pods in the default Node Pool should exist. Changing this forces a new resource to be created."
+  type          = string
+  default       = null
+}
+
 variable "tags" {
   description = "(Optional) Specifies the tags of the bastion host"
   default     = {}
@@ -256,48 +256,6 @@ variable "ingress_application_gateway" {
   }
 }
 
-variable "aci_connector_linux" {
-  description = "Specifies the ACI connector addon configuration."
-  type        = object({
-    enabled     = bool
-    subnet_name = string
-  })
-  default     = {
-    enabled     = false
-    subnet_name = null
-  }
-}
-
-variable "azure_policy" {
-  description = "Specifies the Azure Policy addon configuration."
-  type        = object({
-    enabled     = bool
-  })
-  default     = {
-    enabled     = false
-  }
-}
-
-variable "http_application_routing" {
-  description = "Specifies the HTTP Application Routing addon configuration."
-  type        = object({
-    enabled     = bool
-  })
-  default     = {
-    enabled     = false
-  }
-}
-
-variable "kube_dashboard" {
-  description = "Specifies the Kubernetes Dashboard addon configuration."
-  type        = object({
-    enabled     = bool
-  })
-  default     = {
-    enabled     = false
-  }
-}
-
 variable "admin_username" {
   description = "(Required) Specifies the Admin Username for the AKS cluster worker nodes. Changing this forces a new resource to be created."
   type        = string
@@ -307,4 +265,52 @@ variable "admin_username" {
 variable "ssh_public_key" {
   description = "(Required) Specifies the SSH public key used to access the cluster. Changing this forces a new resource to be created."
   type        = string
+}
+
+variable "keda_enabled" {
+  description = "(Optional) Specifies whether KEDA Autoscaler can be used for workloads."
+  type        = bool
+  default     = true
+}
+
+variable "vertical_pod_autoscaler_enabled" {
+  description = "(Optional) Specifies whether Vertical Pod Autoscaler should be enabled."
+  type        = bool
+  default     = true
+}
+
+variable "workload_identity_enabled" {
+  description = "(Optional) Specifies whether Azure AD Workload Identity should be enabled for the Cluster. Defaults to false."
+  type        = bool
+  default     = true
+}
+
+variable "oidc_issuer_enabled" {
+  description = "(Optional) Enable or Disable the OIDC issuer URL."
+  type        = bool
+  default     = true
+}
+
+variable "open_service_mesh_enabled" {
+  description = "(Optional) Is Open Service Mesh enabled? For more details, please visit Open Service Mesh for AKS."
+  type        = bool
+  default     = true
+}
+
+variable "image_cleaner_enabled" {
+  description = "(Optional) Specifies whether Image Cleaner is enabled."
+  type        = bool
+  default     = true
+}
+
+variable "azure_policy_enabled" {
+  description = "(Optional) Should the Azure Policy Add-On be enabled? For more details please visit Understand Azure Policy for Azure Kubernetes Service"
+  type        = bool
+  default     = true
+}
+
+variable "http_application_routing_enabled" {
+  description = "(Optional) Should HTTP Application Routing be enabled?"
+  type        = bool
+  default     = false
 }

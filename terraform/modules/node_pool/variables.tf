@@ -108,6 +108,12 @@ variable "vnet_subnet_id" {
   default       = null
 }
 
+variable "pod_subnet_id" {
+  description = "(Optional) The ID of the Subnet where the pods in the default Node Pool should exist. Changing this forces a new resource to be created."
+  type          = string
+  default       = null
+}
+
 variable "max_count" {
   description = "(Required) The maximum number of nodes which should exist within this Node Pool. Valid values are between 0 and 1000 and must be greater than or equal to min_count."
   type          = number
@@ -129,4 +135,10 @@ variable "node_count" {
 variable resource_group_name {
   description = "Specifies the resource group name"
   type        = string
+}
+
+variable "oidc_issuer_enabled" {
+  description = " (Optional) Enable or Disable the OIDC issuer URL."
+  type        = bool
+  default     = true
 }
