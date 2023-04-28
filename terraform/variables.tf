@@ -23,7 +23,7 @@ variable "solution_plan_map" {
 
 variable "location" {
   description = "Specifies the location for the resource group and all the resources"
-  default     = "westeurope"
+  default     = "northeurope"
   type        = string
 }
 
@@ -77,7 +77,7 @@ variable "vm_subnet_name" {
 
 variable "vm_subnet_address_prefix" {
   description = "Specifies the address prefix of the jumbox subnet"
-  default     = ["10.0.8.0/21"]
+  default     = ["10.0.48.0/20"]
   type        = list(string)
 }
 
@@ -145,12 +145,6 @@ variable "default_node_pool_availability_zones" {
   type        = list(string)
 }
 
-variable "network_docker_bridge_cidr" {
-  description = "Specifies the Docker bridge CIDR"
-  default     = "172.17.0.1/16"
-  type        = string
-}
-
 variable "network_dns_service_ip" {
   description = "Specifies the DNS service IP"
   default     = "10.2.0.10"
@@ -169,6 +163,18 @@ variable "network_plugin" {
   type        = string
 }
 
+variable "pod_subnet_name" {
+  description = "Specifies the name of the pod subnet."
+  default     =  "PodSubnet"
+  type        = string
+}
+
+variable "pod_subnet_address_prefix" {
+  description = "Specifies the address prefix of the pod subnet"
+  type        = list(string)
+  default     = ["10.0.32.0/20"]
+}
+
 variable "default_node_pool_name" {
   description = "Specifies the name of the default node pool"
   default     =  "system"
@@ -183,7 +189,7 @@ variable "default_node_pool_subnet_name" {
 
 variable "default_node_pool_subnet_address_prefix" {
   description = "Specifies the address prefix of the subnet that hosts the default node pool"
-  default     =  ["10.0.0.0/21"]
+  default     =  ["10.0.0.0/20"]
   type        = list(string)
 }
 
@@ -367,10 +373,26 @@ variable "firewall_name" {
   type        = string
 }
 
+variable "firewall_sku_name" {
+  description = "(Required) SKU name of the Firewall. Possible values are AZFW_Hub and AZFW_VNet. Changing this forces a new resource to be created."
+  default     = "AZFW_VNet"
+  type        = string
+
+  validation {
+    condition = contains(["AZFW_Hub", "AZFW_VNet" ], var.firewall_sku_name)
+    error_message = "The value of the sku name property of the firewall is invalid."
+  }
+}
+
 variable "firewall_sku_tier" {
-  description = "Specifies the SKU tier of the Azure Firewall"
+  description = "(Required) SKU tier of the Firewall. Possible values are Premium, Standard, and Basic."
   default     = "Standard"
   type        = string
+
+  validation {
+    condition = contains(["Premium", "Standard", "Basic" ], var.firewall_sku_tier)
+    error_message = "The value of the sku tier property of the firewall is invalid."
+  }
 }
 
 variable "firewall_threat_intel_mode" {
@@ -611,4 +633,52 @@ variable "script_name" {
   description = "(Required) Specifies the name of the custom script."
   type        = string
   default     = "configure-jumpbox-vm.sh"
+}
+
+variable "keda_enabled" {
+  description = "(Optional) Specifies whether KEDA Autoscaler can be used for workloads."
+  type        = bool
+  default     = true
+}
+
+variable "vertical_pod_autoscaler_enabled" {
+  description = "(Optional) Specifies whether Vertical Pod Autoscaler should be enabled."
+  type        = bool
+  default     = true
+}
+
+variable "workload_identity_enabled" {
+  description = "(Optional) Specifies whether Azure AD Workload Identity should be enabled for the Cluster. Defaults to false."
+  type        = bool
+  default     = true
+}
+
+variable "oidc_issuer_enabled" {
+  description = "(Optional) Enable or Disable the OIDC issuer URL."
+  type        = bool
+  default     = true
+}
+
+variable "open_service_mesh_enabled" {
+  description = "(Optional) Is Open Service Mesh enabled? For more details, please visit Open Service Mesh for AKS."
+  type        = bool
+  default     = true
+}
+
+variable "image_cleaner_enabled" {
+  description = "(Optional) Specifies whether Image Cleaner is enabled."
+  type        = bool
+  default     = true
+}
+
+variable "azure_policy_enabled" {
+  description = "(Optional) Should the Azure Policy Add-On be enabled? For more details please visit Understand Azure Policy for Azure Kubernetes Service"
+  type        = bool
+  default     = true
+}
+
+variable "http_application_routing_enabled" {
+  description = "(Optional) Should HTTP Application Routing be enabled?"
+  type        = bool
+  default     = false
 }

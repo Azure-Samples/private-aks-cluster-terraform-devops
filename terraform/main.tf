@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "2.60"
+      version = "3.50"
     }
   }
 }
@@ -88,6 +88,12 @@ module "aks_network" {
       enforce_private_link_service_network_policies : false
     },
     {
+      name : var.pod_subnet_name
+      address_prefixes : var.pod_subnet_address_prefix
+      enforce_private_link_endpoint_network_policies : true
+      enforce_private_link_service_network_policies : false
+    },
+    {
       name : var.vm_subnet_name
       address_prefixes : var.vm_subnet_address_prefix
       enforce_private_link_endpoint_network_policies : true
@@ -115,6 +121,7 @@ module "firewall" {
   zones                        = var.firewall_zones
   threat_intel_mode            = var.firewall_threat_intel_mode
   location                     = var.location
+  sku_name                     = var.firewall_sku_name 
   sku_tier                     = var.firewall_sku_tier
   pip_name                     = "${var.firewall_name}PublicIp"
   subnet_id                    = module.hub_network.subnet_ids["AzureFirewallSubnet"]
@@ -181,7 +188,6 @@ module "aks_cluster" {
   default_node_pool_node_count             = var.default_node_pool_node_count
   default_node_pool_os_disk_type           = var.default_node_pool_os_disk_type
   tags                                     = var.tags
-  network_docker_bridge_cidr               = var.network_docker_bridge_cidr
   network_dns_service_ip                   = var.network_dns_service_ip
   network_plugin                           = var.network_plugin
   outbound_type                            = "userDefinedRouting"
@@ -193,6 +199,14 @@ module "aks_cluster" {
   azure_rbac_enabled                       = var.azure_rbac_enabled
   admin_username                           = var.admin_username
   ssh_public_key                           = var.ssh_public_key
+  keda_enabled                             = var.keda_enabled
+  vertical_pod_autoscaler_enabled          = var.vertical_pod_autoscaler_enabled
+  workload_identity_enabled                = var.workload_identity_enabled
+  oidc_issuer_enabled                      = var.oidc_issuer_enabled
+  open_service_mesh_enabled                = var.open_service_mesh_enabled
+  image_cleaner_enabled                    = var.image_cleaner_enabled
+  azure_policy_enabled                     = var.azure_policy_enabled
+  http_application_routing_enabled         = var.http_application_routing_enabled
 
   depends_on                               = [module.routetable]
 }
@@ -217,7 +231,7 @@ resource "random_string" "storage_account_suffix" {
   special = false
   lower   = true
   upper   = false
-  number  = false
+  numeric  = false
 }
 
 module "storage_account" {
