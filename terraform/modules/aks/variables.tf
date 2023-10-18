@@ -204,12 +204,6 @@ variable "tenant_id" {
   type        = string
 }
 
-variable "log_analytics_retention_days" {
-  description = "Specifies the number of days of the retention policy"
-  type        = number
-  default     = 30
-}
-
 variable "vnet_subnet_id" {
   description = "(Optional) The ID of a Subnet where the Kubernetes Node Pool should exist. Changing this forces a new resource to be created."
   type        = string

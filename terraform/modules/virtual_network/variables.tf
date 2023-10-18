@@ -23,8 +23,8 @@ variable "subnets" {
   type = list(object({
     name                                           = string
     address_prefixes                               = list(string)
-    enforce_private_link_endpoint_network_policies = bool
-    enforce_private_link_service_network_policies  = bool
+    private_endpoint_network_policies_enabled      = bool
+    private_link_service_network_policies_enabled  = bool
   }))
 }
 
@@ -36,10 +36,4 @@ variable "tags" {
 variable "log_analytics_workspace_id" {
   description = "Specifies the log analytics workspace id"
   type        = string
-}
-
-variable "log_analytics_retention_days" {
-  description = "Specifies the number of days of the retention policy"
-  type        = number
-  default     = 7
 }
