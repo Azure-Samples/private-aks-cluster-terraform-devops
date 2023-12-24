@@ -2,7 +2,7 @@
 resource "random_string" "tf-name" {
   length = 8
   upper = false
-  number = true
+  numeric = true
   lower = true
   special = false
 }
