@@ -30,13 +30,13 @@ variable "private_cluster_enabled" {
 }
 
 variable "azure_rbac_enabled" {
-  description = "(Optional) Is Role Based Access Control based on Azure AD enabled?"
+  description = "(Optional) Is Role Based Access Control based on Microsoft Entra ID enabled?"
   default     = true
   type        = bool
 }
 
 variable "admin_group_object_ids" {
-  description = "(Optional) A list of Object IDs of Azure Active Directory Groups which should have Admin Role on the Cluster."
+  description = "(Optional) A list of Object IDs of Microsoft Entra ID Groups which should have Admin Role on the Cluster."
   default     = []
   type        = list(string)
 }
@@ -280,7 +280,7 @@ variable "vertical_pod_autoscaler_enabled" {
 }
 
 variable "workload_identity_enabled" {
-  description = "(Optional) Specifies whether Azure AD Workload Identity should be enabled for the Cluster. Defaults to false."
+  description = "(Optional) Specifies whether Microsoft Entra ID Workload Identity should be enabled for the Cluster. Defaults to false."
   type        = bool
   default     = true
 }
