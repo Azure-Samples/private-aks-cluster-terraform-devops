@@ -62,7 +62,7 @@ The following picture provides a more detailed view of the infrastructure on Azu
 
 The architecture is composed of the following elements:
 
-- A hub virtual network with two subnets:
+- A hub virtual network with three subnets:
   - AzureBastionSubnet used by Azure Bastion
   - AzureFirewallSubnet used by Azure Firewall
 - A new virtual network with three subnets:
@@ -301,7 +301,7 @@ When running applications on AKS, you can use one of the following API Gateways:
 - **Service Mesh Ingress Controller**: If you are using a service mesh such as [Open Service Mesh](https://openservicemesh.io/), [Linkerd](https://linkerd.io/), and [Istio](https://istio.io/), consider the features that are provided by the ingress controller for that service mesh. For example, the Istio ingress controller supports layer 7 routing, HTTP redirects, retries, and other features.
 - **Azure Application Gateway**: [Azure Application Gateway](https://docs.microsoft.com/en-us/azure/application-gateway/overview) is a regional, fully-managed load balancing service that can perform layer-7 routing and SSL termination. It also provides a Web Access Firewall and an [ingress controller](https://docs.microsoft.com/en-us/azure/application-gateway/ingress-controller-overview) for Kubernetes. For more information, see [Use Application Gateway Ingress Controller (AGIC) with a multi-tenant Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/architecture/example-scenario/aks-agic/aks-agic).
 - **Azure Front Door**:  [Azure Front Door](https://docs.microsoft.com/en-us/azure/frontdoor/front-door-overview) is a global layer 7 load balancer that uses the Microsoft global edge network to create fast, secure, and widely scalable web applications. It supports features such as SSL termination, response caching, WAF at the edge, URL-based routing, rewrite and redirections, it support multiple routing methods such as priority routing and latency-based routing.
-- **Azure API Management**: [API Management](https://docs.microsoft.com/en-us/azure/api-management/api-management-key-concepts) is a turnkey solution for publishing APIs to both external and internal customers. It provides features that are useful for managing a public-facing API, including rate limiting, IP restrictions, and authentication and authorization using Azure Active Directory or other identity providers.
+- **Azure API Management**: [API Management](https://docs.microsoft.com/en-us/azure/api-management/api-management-key-concepts) is a turnkey solution for publishing APIs to both external and internal customers. It provides features that are useful for managing a public-facing API, including rate limiting, IP restrictions, and authentication and authorization using Microsoft Entra ID or other identity providers.
 
 ## Use Azure Firewall in front of an internal Standard Load Balancer ##
 

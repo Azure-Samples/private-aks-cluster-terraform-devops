@@ -105,13 +105,13 @@ variable "automatic_channel_upgrade" {
 }
 
 variable "admin_group_object_ids" {
-  description = "(Optional) A list of Object IDs of Azure Active Directory Groups which should have Admin Role on the Cluster."
+  description = "(Optional) A list of Object IDs of Microsoft Entra ID Groups which should have Admin Role on the Cluster."
   default     = ["6e5de8c1-5a4b-409b-994f-0706e4403b77", "78761057-c58c-44b7-aaa7-ce1639c6c4f5"]
   type        = list(string)
 }
 
 variable "azure_rbac_enabled" {
-  description = "(Optional) Is Role Based Access Control based on Azure AD enabled?"
+  description = "(Optional) Is Role Based Access Control based on Microsoft Entra ID enabled?"
   default     = true
   type        = bool
 }
@@ -446,8 +446,8 @@ variable "vm_os_disk_image" {
   description = "Specifies the os disk image of the virtual machine"
   default     = {
     publisher = "Canonical"
-    offer     = "UbuntuServer"
-    sku       = "18.04-LTS" 
+    offer     = "0001-com-ubuntu-server-jammy"
+    sku       = "22_04-lts-gen2" 
     version   = "latest"
   }
 }
@@ -648,7 +648,7 @@ variable "vertical_pod_autoscaler_enabled" {
 }
 
 variable "workload_identity_enabled" {
-  description = "(Optional) Specifies whether Azure AD Workload Identity should be enabled for the Cluster. Defaults to false."
+  description = "(Optional) Specifies whether Microsoft Entra ID Workload Identity should be enabled for the Cluster. Defaults to false."
   type        = bool
   default     = true
 }
