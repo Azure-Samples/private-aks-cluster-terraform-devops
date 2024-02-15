@@ -194,7 +194,7 @@ variable "default_node_pool_subnet_address_prefix" {
 }
 
 variable "default_node_pool_enable_auto_scaling" {
-  description = "(Optional) Whether to enable auto-scaler. Defaults to false."
+  description = "(Optional) Whether to enable auto-scaler. Defaults to true."
   type          = bool
   default       = true
 }
