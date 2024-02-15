@@ -47,20 +47,19 @@ module "hub_network" {
   address_space                = var.hub_address_space
   tags                         = var.tags
   log_analytics_workspace_id   = module.log_analytics_workspace.id
-  log_analytics_retention_days = var.log_analytics_retention_days
 
   subnets = [
     {
       name : "AzureFirewallSubnet"
       address_prefixes : var.hub_firewall_subnet_address_prefix
-      enforce_private_link_endpoint_network_policies : true
-      enforce_private_link_service_network_policies : false
+      private_endpoint_network_policies_enabled : true
+      private_link_service_network_policies_enabled : false
     },
     {
       name : "AzureBastionSubnet"
       address_prefixes : var.hub_bastion_subnet_address_prefix
-      enforce_private_link_endpoint_network_policies : true
-      enforce_private_link_service_network_policies : false
+      private_endpoint_network_policies_enabled : true
+      private_link_service_network_policies_enabled : false
     }
   ]
 }
@@ -72,32 +71,31 @@ module "aks_network" {
   vnet_name                    = var.aks_vnet_name
   address_space                = var.aks_vnet_address_space
   log_analytics_workspace_id   = module.log_analytics_workspace.id
-  log_analytics_retention_days = var.log_analytics_retention_days
 
   subnets = [
     {
       name : var.default_node_pool_subnet_name
       address_prefixes : var.default_node_pool_subnet_address_prefix
-      enforce_private_link_endpoint_network_policies : true
-      enforce_private_link_service_network_policies : false
+      private_endpoint_network_policies_enabled : true
+      private_link_service_network_policies_enabled : false
     },
     {
       name : var.additional_node_pool_subnet_name
       address_prefixes : var.additional_node_pool_subnet_address_prefix
-      enforce_private_link_endpoint_network_policies : true
-      enforce_private_link_service_network_policies : false
+      private_endpoint_network_policies_enabled : true
+      private_link_service_network_policies_enabled : false
     },
     {
       name : var.pod_subnet_name
       address_prefixes : var.pod_subnet_address_prefix
-      enforce_private_link_endpoint_network_policies : true
-      enforce_private_link_service_network_policies : false
+      private_endpoint_network_policies_enabled : true
+      private_link_service_network_policies_enabled : false
     },
     {
       name : var.vm_subnet_name
       address_prefixes : var.vm_subnet_address_prefix
-      enforce_private_link_endpoint_network_policies : true
-      enforce_private_link_service_network_policies : false
+      private_endpoint_network_policies_enabled : true
+      private_link_service_network_policies_enabled : false
     }
   ]
 }
@@ -126,7 +124,6 @@ module "firewall" {
   pip_name                     = "${var.firewall_name}PublicIp"
   subnet_id                    = module.hub_network.subnet_ids["AzureFirewallSubnet"]
   log_analytics_workspace_id   = module.log_analytics_workspace.id
-  log_analytics_retention_days = var.log_analytics_retention_days
 }
 
 module "routetable" {
@@ -159,7 +156,6 @@ module "container_registry" {
   admin_enabled                = var.acr_admin_enabled
   georeplication_locations     = var.acr_georeplication_locations
   log_analytics_workspace_id   = module.log_analytics_workspace.id
-  log_analytics_retention_days = var.log_analytics_retention_days
 }
 
 module "aks_cluster" {
@@ -251,7 +247,6 @@ module "bastion_host" {
   resource_group_name          = azurerm_resource_group.rg.name
   subnet_id                    = module.hub_network.subnet_ids["AzureBastionSubnet"]
   log_analytics_workspace_id   = module.log_analytics_workspace.id
-  log_analytics_retention_days = var.log_analytics_retention_days
 }
 
 module "virtual_machine" {
@@ -271,7 +266,6 @@ module "virtual_machine" {
   log_analytics_workspace_id          = module.log_analytics_workspace.workspace_id
   log_analytics_workspace_key         = module.log_analytics_workspace.primary_shared_key
   log_analytics_workspace_resource_id = module.log_analytics_workspace.id
-  log_analytics_retention_days        = var.log_analytics_retention_days
   script_storage_account_name         = var.script_storage_account_name
   script_storage_account_key          = var.script_storage_account_key
   container_name                      = var.container_name
@@ -321,7 +315,6 @@ module "key_vault" {
   bypass                          = var.key_vault_bypass
   default_action                  = var.key_vault_default_action
   log_analytics_workspace_id      = module.log_analytics_workspace.id
-  log_analytics_retention_days    = var.log_analytics_retention_days
 }
 
 module "acr_private_dns_zone" {

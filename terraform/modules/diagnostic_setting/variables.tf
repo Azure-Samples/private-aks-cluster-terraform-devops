@@ -14,18 +14,6 @@ variable "location" {
   type        = string
 }
 
-variable "retention_policy_enabled" {
-  description = "(Required) Is this Retention Policy enabled?"
-  type        = bool
-  default     = true
-}
-
-variable "retention_policy_days" {
-  description = "(Optional) The number of days for which this Retention Policy should apply."
-  type        = number
-  default     = 30
-}
-
 variable "target_resource_id" {
   description = "(Required) The ID of an existing Resource on which to configure Diagnostic Settings. Changing this forces a new resource to be created."
   type        = string
